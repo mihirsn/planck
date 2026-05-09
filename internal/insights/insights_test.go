@@ -12,7 +12,7 @@ func TestGenerate_NoInsights(t *testing.T) {
 
 	report := metrics.Report{
 		ErrorEndpoints: []metrics.EndpointStat{
-			{Path: "/a", ErrorRate: 5.0},  // below threshold
+			{Path: "/a", ErrorRate: 5.0}, // below threshold
 		},
 		SlowEndpoints: []metrics.EndpointStat{
 			{Path: "/b", AvgLatencyMs: 300}, // below threshold

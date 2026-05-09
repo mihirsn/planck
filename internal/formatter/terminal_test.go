@@ -181,7 +181,7 @@ func TestPrintTerminal_HighErrorRateColor(t *testing.T) {
 	var buf bytes.Buffer
 	report := makeReport()
 	report.ErrorEndpoints = []metrics.EndpointStat{
-		{Path: "/bad", ErrorRate: 25.0},  // >= 10% → red
+		{Path: "/bad", ErrorRate: 25.0}, // >= 10% → red
 		{Path: "/ok", ErrorRate: 5.0},   // < 10% → yellow
 	}
 	formatter.PrintTerminal(&buf, report)
