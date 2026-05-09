@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
   </a>
   <a href="https://go.dev/">
-    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go" alt="Go Version">
+    <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go" alt="Go Version">
   </a>
   <img src="https://img.shields.io/badge/status-early%20alpha-orange" alt="Status: Early Alpha">
 </p>
