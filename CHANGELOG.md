@@ -9,8 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.1.1] - 2026-05-09
+
 ### Added
-- Initial project scaffolding
+- **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, and Spring Boot
+- **Custom field flags** — `--field-timestamp`, `--field-method`, `--field-path`, `--field-status`, `--field-latency` to map any JSON log schema
+- **Float latency auto-detection** — latency values expressed as decimal seconds (e.g. FastAPI `duration: 0.120`) are automatically converted to milliseconds (120ms)
+- Sample log files: `sample-logs/fastapi.log`, `sample-logs/express.log`
+- `models.FieldMap` — public struct for field name configuration
+- `models.PresetFieldMap()` — preset lookup with validation
+- `models.AvailablePresets()` — list of all built-in presets
+- Git pre-commit hook (`.githooks/pre-commit`) — auto-runs `gofmt` on staged Go files
+- `make hooks` — install git hooks (run once after cloning)
+- `make fmt` — format all Go source files
+
+### Fixed
+- `go.mod` Go version directive lowered from `1.26.2` to `1.22` for golangci-lint compatibility
+
+---
+
+## [0.1.0] - 2026-05-07
+
+### Added
+- Initial release
 - `planck analyze <file>` — analyze JSON log files
 - `planck analyze --docker <container>` — analyze Docker container logs
 - `--tail`, `--since` flags for Docker log fetching
@@ -18,9 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--top N` flag to control number of top endpoints shown (default: 5)
 - `--slow N` flag to control number of slowest endpoints shown (default: 5)
 - Metrics: total requests, top endpoints, traffic by hour, error rates, avg/P95 latency
-- Terminal formatter with color-coded output
-- Insights: slow endpoint detection, high error rate detection
+- Terminal formatter with ANSI color-coded output and ASCII progress bars
+- Insights: high error rate and slow endpoint detection
+- GitHub Actions CI and release workflows with goreleaser
 
 ---
 
-[Unreleased]: https://github.com/mihirsn/planck/compare/HEAD...HEAD
+[Unreleased]: https://github.com/mihirsn/planck/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mihirsn/planck/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/mihirsn/planck/releases/tag/v0.1.0

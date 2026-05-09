@@ -5,23 +5,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mihirsn/planck/internal/formatter"
 	"github.com/mihirsn/planck/internal/metrics"
+	"github.com/mihirsn/planck/internal/models"
 	"github.com/mihirsn/planck/internal/parser"
 	"github.com/mihirsn/planck/internal/source"
 )
 
 // analyzeFlags holds all CLI flags for the analyze command.
 type analyzeFlags struct {
+	// Source selection.
 	docker string
 	tail   int
 	since  string
+
+	// Output.
 	format string
 	top    int
 	slow   int
+
+	// Field mapping.
+	preset         string
+	fieldTimestamp string
+	fieldMethod    string
+	fieldPath      string
+	fieldStatus    string
+	fieldLatency   string
 }
 
 var flags analyzeFlags
@@ -32,27 +45,37 @@ var analyzeCmd = &cobra.Command{
 	Short: "Analyze application logs and display operational insights",
 	Long: `Analyze JSON-formatted application logs from a file or a Docker container.
 
-Supported log format (one JSON object per line):
+Planck supports any JSON log schema via field mapping flags and presets.
+
+Default schema (one JSON object per line):
   {"timestamp":"2026-05-08T14:05:00Z","method":"POST","path":"/invoice","status":200,"latency_ms":120}
 
+Built-in presets:
+  fastapi   FastAPI / uvicorn (status_code, duration as float seconds)
+  express   Express.js with morgan JSON middleware (url, statusCode, responseTime)
+  gin       Go Gin with JSON logger middleware (time, status, latency)
+  echo      Go Echo with JSON logger middleware (time, uri, status, latency)
+  spring    Spring Boot with custom JSON HTTP filter (uri, status, duration)
+
 Examples:
-  # Analyze a local log file
+  # Analyze with default schema
   planck analyze app.log
 
-  # Analyze Docker container logs
-  planck analyze --docker invoice-api
+  # Use a built-in preset
+  planck analyze app.log --preset fastapi
+  planck analyze --docker my-api --preset express
 
-  # Fetch only the last 1000 lines from Docker
-  planck analyze --docker invoice-api --tail 1000
+  # Custom field mapping
+  planck analyze app.log --field-path url --field-status code --field-latency dur
 
-  # Fetch Docker logs from the last hour
-  planck analyze --docker invoice-api --since 1h
+  # Mix: preset + override one field
+  planck analyze app.log --preset fastapi --field-latency process_time_ms
 
-  # Output as JSON (pipe-friendly)
-  planck analyze app.log --format json
+  # Docker with options
+  planck analyze --docker invoice-api --tail 1000 --since 1h
 
-  # Show top 10 endpoints instead of the default 5
-  planck analyze app.log --top 10`,
+  # JSON output
+  planck analyze app.log --format json | jq '.top_endpoints'`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		dockerFlag := cmd.Flags().Lookup("docker").Value.String()
 		if dockerFlag == "" && len(args) == 0 {
@@ -67,21 +90,40 @@ Examples:
 }
 
 func init() {
+	// Source flags.
 	analyzeCmd.Flags().StringVar(&flags.docker, "docker", "", "Docker container name or ID to analyze")
 	analyzeCmd.Flags().IntVar(&flags.tail, "tail", 0, "Number of log lines to fetch from Docker (0 = all)")
-	analyzeCmd.Flags().StringVar(&flags.since, "since", "", "Fetch Docker logs since duration (e.g. 1h, 30m, 2024-01-01)")
+	analyzeCmd.Flags().StringVar(&flags.since, "since", "", "Fetch Docker logs since duration (e.g. 1h, 30m)")
+
+	// Output flags.
 	analyzeCmd.Flags().StringVar(&flags.format, "format", "text", "Output format: text or json")
 	analyzeCmd.Flags().IntVar(&flags.top, "top", 5, "Number of top endpoints to display")
 	analyzeCmd.Flags().IntVar(&flags.slow, "slow", 5, "Number of slowest endpoints to display")
+
+	// Field mapping flags.
+	analyzeCmd.Flags().StringVar(&flags.preset, "preset", "",
+		fmt.Sprintf("Field mapping preset for a known framework (%s)", strings.Join(models.AvailablePresets(), ", ")))
+	analyzeCmd.Flags().StringVar(&flags.fieldTimestamp, "field-timestamp", "", "JSON key for the timestamp field (overrides preset)")
+	analyzeCmd.Flags().StringVar(&flags.fieldMethod, "field-method", "", "JSON key for the HTTP method field (overrides preset)")
+	analyzeCmd.Flags().StringVar(&flags.fieldPath, "field-path", "", "JSON key for the request path field (overrides preset)")
+	analyzeCmd.Flags().StringVar(&flags.fieldStatus, "field-status", "", "JSON key for the HTTP status code field (overrides preset)")
+	analyzeCmd.Flags().StringVar(&flags.fieldLatency, "field-latency", "", "JSON key for the latency field (overrides preset)")
 
 	rootCmd.AddCommand(analyzeCmd)
 }
 
 // runAnalyze is the main handler for the analyze command.
 func runAnalyze(cmd *cobra.Command, args []string) error {
-	// Validate --format flag value.
+	// Validate --format flag.
 	if flags.format != "text" && flags.format != "json" {
 		return fmt.Errorf("unsupported format %q: must be 'text' or 'json'", flags.format)
+	}
+
+	// Build the FieldMap: start from preset (or default), then apply overrides.
+	fieldMap, err := buildFieldMap()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return nil //nolint:nilerr
 	}
 
 	// Select the appropriate log source.
@@ -92,7 +134,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		dockerSrc, err := source.NewDockerSource(flags.docker, flags.tail, flags.since)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
-			return nil //nolint:nilerr // user-facing errors are printed above
+			return nil //nolint:nilerr
 		}
 		src = dockerSrc
 		sourceName = fmt.Sprintf("Docker container %q", flags.docker)
@@ -100,7 +142,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		fileSrc, err := source.NewFileSource(args[0])
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
-			return nil //nolint:nilerr // user-facing errors are printed above
+			return nil //nolint:nilerr
 		}
 		src = fileSrc
 		sourceName = fmt.Sprintf("file %q", args[0])
@@ -112,7 +154,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to open log source: %w", err)
 	}
 
-	p := parser.New()
+	p := parser.New(fieldMap)
 	entries, malformed := p.ParseAll(lineCh)
 
 	if len(entries) == 0 {
@@ -139,4 +181,33 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// buildFieldMap constructs a FieldMap by loading the preset (if set) and
+// then applying any individual --field-* overrides on top.
+// Resolution order (highest priority first): --field-* flags → preset → default.
+func buildFieldMap() (models.FieldMap, error) {
+	fm, err := models.PresetFieldMap(flags.preset)
+	if err != nil {
+		return models.FieldMap{}, err
+	}
+
+	// Individual flags override preset values when explicitly set.
+	if flags.fieldTimestamp != "" {
+		fm.Timestamp = flags.fieldTimestamp
+	}
+	if flags.fieldMethod != "" {
+		fm.Method = flags.fieldMethod
+	}
+	if flags.fieldPath != "" {
+		fm.Path = flags.fieldPath
+	}
+	if flags.fieldStatus != "" {
+		fm.Status = flags.fieldStatus
+	}
+	if flags.fieldLatency != "" {
+		fm.LatencyMs = flags.fieldLatency
+	}
+
+	return fm, nil
 }

@@ -263,14 +263,45 @@ Planck still works. It will show you request counts, top endpoints, traffic by h
 
 ## Flags Reference
 
+### Source flags
+
 | Flag | Default | Description |
 |---|---|---|
 | `--docker` | — | Docker container name or ID |
 | `--tail` | 0 (all) | Number of log lines to fetch from Docker |
 | `--since` | — | Fetch logs since duration (e.g. `1h`, `30m`) |
+
+### Output flags
+
+| Flag | Default | Description |
+|---|---|---|
 | `--format` | `text` | Output format: `text` or `json` |
 | `--top` | 5 | Number of top endpoints to display |
 | `--slow` | 5 | Number of slowest endpoints to display |
+
+### Field mapping flags
+
+Use these flags to tell Planck which JSON keys to read from your logs.
+Individual `--field-*` flags always override the `--preset` value.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--preset` | — | Load a built-in field mapping preset (see table below) |
+| `--field-timestamp` | `timestamp` | JSON key for the timestamp |
+| `--field-method` | `method` | JSON key for the HTTP method |
+| `--field-path` | `path` | JSON key for the request path |
+| `--field-status` | `status` | JSON key for the HTTP status code |
+| `--field-latency` | `latency_ms` | JSON key for the request latency |
+
+### Built-in presets
+
+| Preset | Framework | `--field-path` | `--field-status` | `--field-latency` | Notes |
+|---|---|---|---|---|---|
+| `fastapi` | FastAPI / uvicorn | `path` | `status_code` | `duration` | latency auto-converted from seconds |
+| `express` | Express.js + morgan | `url` | `statusCode` | `responseTime` | |
+| `gin` | Go Gin | `path` | `status` | `latency` | |
+| `echo` | Go Echo | `uri` | `status` | `latency` | |
+| `spring` | Spring Boot | `uri` | `status` | `duration` | |
 
 ---
 

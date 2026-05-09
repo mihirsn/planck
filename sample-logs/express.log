@@ -1,0 +1,18 @@
+{"timestamp":"2026-05-08T14:00:01Z","method":"GET","url":"/api/users","statusCode":200,"responseTime":45}
+{"timestamp":"2026-05-08T14:00:03Z","method":"POST","url":"/api/users","statusCode":201,"responseTime":120}
+{"timestamp":"2026-05-08T14:00:07Z","method":"GET","url":"/api/products","statusCode":200,"responseTime":33}
+{"timestamp":"2026-05-08T14:01:00Z","method":"GET","url":"/api/products","statusCode":200,"responseTime":890}
+{"timestamp":"2026-05-08T14:01:10Z","method":"DELETE","url":"/api/products/5","statusCode":404,"responseTime":12}
+{"timestamp":"2026-05-08T14:01:25Z","method":"GET","url":"/api/users","statusCode":401,"responseTime":8}
+{"timestamp":"2026-05-08T14:01:40Z","method":"PUT","url":"/api/users/3","statusCode":200,"responseTime":78}
+{"timestamp":"2026-05-08T14:02:00Z","method":"GET","url":"/api/products","statusCode":500,"responseTime":2100}
+{"timestamp":"2026-05-08T14:02:15Z","method":"POST","url":"/api/orders","statusCode":201,"responseTime":95}
+{"timestamp":"2026-05-08T14:02:30Z","method":"GET","url":"/api/orders","statusCode":200,"responseTime":41}
+not valid json — this line should be skipped gracefully
+{"timestamp":"2026-05-08T14:03:00Z","method":"GET","url":"/api/users","statusCode":200,"responseTime":38}
+{"timestamp":"2026-05-08T14:03:20Z","method":"GET","url":"/api/products","statusCode":200,"responseTime":720}
+{"timestamp":"2026-05-08T14:03:45Z","method":"POST","url":"/api/users","statusCode":400,"responseTime":22}
+{"timestamp":"2026-05-08T15:00:00Z","method":"GET","url":"/api/orders","statusCode":200,"responseTime":55}
+{"timestamp":"2026-05-08T15:00:30Z","method":"GET","url":"/api/users","statusCode":200,"responseTime":44}
+{"timestamp":"2026-05-08T15:01:00Z","method":"DELETE","url":"/api/orders/9","statusCode":204,"responseTime":30}
+{"timestamp":"2026-05-08T15:01:30Z","method":"GET","url":"/api/products","statusCode":200,"responseTime":380}

@@ -1,0 +1,18 @@
+{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/users","status_code":200,"duration":0.045}
+{"timestamp":"2026-05-08T14:00:03Z","method":"POST","path":"/users","status_code":201,"duration":0.120}
+{"timestamp":"2026-05-08T14:00:05Z","method":"GET","path":"/users","status_code":200,"duration":0.033}
+{"timestamp":"2026-05-08T14:01:02Z","method":"GET","path":"/items","status_code":200,"duration":0.890}
+{"timestamp":"2026-05-08T14:01:10Z","method":"POST","path":"/items","status_code":422,"duration":0.012}
+{"timestamp":"2026-05-08T14:01:25Z","method":"GET","path":"/items","status_code":200,"duration":1.240}
+{"timestamp":"2026-05-08T14:02:00Z","method":"DELETE","path":"/items/42","status_code":204,"duration":0.055}
+{"timestamp":"2026-05-08T14:02:15Z","method":"GET","path":"/users","status_code":401,"duration":0.008}
+{"timestamp":"2026-05-08T14:02:30Z","method":"GET","path":"/items","status_code":500,"duration":2.100}
+{"timestamp":"2026-05-08T14:03:00Z","method":"PUT","path":"/users/7","status_code":200,"duration":0.078}
+{"timestamp":"2026-05-08T14:03:20Z","method":"GET","path":"/users","status_code":200,"duration":0.041}
+{"timestamp":"2026-05-08T14:03:45Z","method":"POST","path":"/items","status_code":201,"duration":0.095}
+not valid json — this line should be skipped gracefully
+{"timestamp":"2026-05-08T15:00:01Z","method":"GET","path":"/users","status_code":200,"duration":0.038}
+{"timestamp":"2026-05-08T15:00:30Z","method":"GET","path":"/items","status_code":200,"duration":0.720}
+{"timestamp":"2026-05-08T15:01:00Z","method":"POST","path":"/users","status_code":201,"duration":0.112}
+{"timestamp":"2026-05-08T15:01:30Z","method":"GET","path":"/users","status_code":200,"duration":0.044}
+{"timestamp":"2026-05-08T15:02:00Z","method":"GET","path":"/items","status_code":404,"duration":0.007}

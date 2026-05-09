@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mihirsn/planck/internal/models"
 	"github.com/mihirsn/planck/internal/parser"
 )
 
@@ -17,6 +18,11 @@ func makeChannel(lines []string) <-chan string {
 	return ch
 }
 
+// defaultParser returns a parser using the default (native Planck) field map.
+func defaultParser() *parser.Parser {
+	return parser.New(models.DefaultFieldMap())
+}
+
 func TestParseAll_ValidLines(t *testing.T) {
 	t.Parallel()
 
@@ -25,8 +31,7 @@ func TestParseAll_ValidLines(t *testing.T) {
 		`{"timestamp":"2026-05-08T14:00:03Z","method":"POST","path":"/invoice","status":201,"latency_ms":130}`,
 	}
 
-	p := parser.New()
-	entries, malformed := p.ParseAll(makeChannel(lines))
+	entries, malformed := defaultParser().ParseAll(makeChannel(lines))
 
 	if len(entries) != 2 {
 		t.Errorf("expected 2 entries, got %d", len(entries))
@@ -34,7 +39,6 @@ func TestParseAll_ValidLines(t *testing.T) {
 	if malformed != 0 {
 		t.Errorf("expected 0 malformed, got %d", malformed)
 	}
-
 	if entries[0].Path != "/login" {
 		t.Errorf("expected path /login, got %s", entries[0].Path)
 	}
@@ -59,8 +63,7 @@ func TestParseAll_MalformedLines(t *testing.T) {
 		`{"timestamp":"2026-05-08T14:00:03Z","method":"POST","path":"/invoice","status":201}`,
 	}
 
-	p := parser.New()
-	entries, malformed := p.ParseAll(makeChannel(lines))
+	entries, malformed := defaultParser().ParseAll(makeChannel(lines))
 
 	if len(entries) != 2 {
 		t.Errorf("expected 2 valid entries, got %d", len(entries))
@@ -74,9 +77,7 @@ func TestParseAll_EmptyLine(t *testing.T) {
 	t.Parallel()
 
 	lines := []string{"", "   "}
-	p := parser.New()
-	// Empty strings are invalid JSON so they are malformed.
-	_, malformed := p.ParseAll(makeChannel(lines))
+	_, malformed := defaultParser().ParseAll(makeChannel(lines))
 	if malformed != 2 {
 		t.Errorf("expected 2 malformed for empty/whitespace lines, got %d", malformed)
 	}
@@ -88,7 +89,7 @@ func TestParseAll_MissingRequiredFields(t *testing.T) {
 	tests := []struct {
 		name string
 		line string
-		want int // expected valid entries
+		want int
 	}{
 		{
 			name: "missing path",
@@ -110,8 +111,7 @@ func TestParseAll_MissingRequiredFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := parser.New()
-			entries, _ := p.ParseAll(makeChannel([]string{tt.line}))
+			entries, _ := defaultParser().ParseAll(makeChannel([]string{tt.line}))
 			if len(entries) != tt.want {
 				t.Errorf("expected %d entries, got %d", tt.want, len(entries))
 			}
@@ -123,8 +123,7 @@ func TestParseAll_TimestampParsed(t *testing.T) {
 	t.Parallel()
 
 	line := `{"timestamp":"2026-05-08T14:05:00Z","path":"/invoice","status":200,"latency_ms":120}`
-	p := parser.New()
-	entries, _ := p.ParseAll(makeChannel([]string{line}))
+	entries, _ := defaultParser().ParseAll(makeChannel([]string{line}))
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -139,13 +138,194 @@ func TestParseAll_TimestampParsed(t *testing.T) {
 func TestParseAll_EmptyChannel(t *testing.T) {
 	t.Parallel()
 
-	p := parser.New()
-	entries, malformed := p.ParseAll(makeChannel([]string{}))
+	entries, malformed := defaultParser().ParseAll(makeChannel([]string{}))
 
 	if len(entries) != 0 {
 		t.Errorf("expected 0 entries for empty channel, got %d", len(entries))
 	}
 	if malformed != 0 {
 		t.Errorf("expected 0 malformed for empty channel, got %d", malformed)
+	}
+}
+
+// --- FieldMap / preset tests ---
+
+func TestParseAll_FastAPIPreset(t *testing.T) {
+	t.Parallel()
+
+	// FastAPI log: status_code instead of status, duration (float seconds) instead of latency_ms.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/users","status_code":200,"duration":0.120}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"POST","path":"/items","status_code":422,"duration":0.045}`,
+	}
+
+	fm, err := models.PresetFieldMap(models.PresetFastAPI)
+	if err != nil {
+		t.Fatalf("PresetFieldMap: %v", err)
+	}
+	p := parser.New(fm)
+	entries, malformed := p.ParseAll(makeChannel(lines))
+
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].Status != 200 {
+		t.Errorf("fastapi: expected status 200, got %d", entries[0].Status)
+	}
+	// 0.120 seconds → 120ms
+	if entries[0].LatencyMs != 120 {
+		t.Errorf("fastapi: expected latency 120ms from 0.120s, got %d", entries[0].LatencyMs)
+	}
+	if entries[1].Status != 422 {
+		t.Errorf("fastapi: expected status 422, got %d", entries[1].Status)
+	}
+	// 0.045 seconds → 45ms
+	if entries[1].LatencyMs != 45 {
+		t.Errorf("fastapi: expected latency 45ms from 0.045s, got %d", entries[1].LatencyMs)
+	}
+}
+
+func TestParseAll_ExpressPreset(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","url":"/api/users","statusCode":200,"responseTime":85}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"DELETE","url":"/api/items/1","statusCode":404,"responseTime":12}`,
+	}
+
+	fm, _ := models.PresetFieldMap(models.PresetExpress)
+	p := parser.New(fm)
+	entries, malformed := p.ParseAll(makeChannel(lines))
+
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].Path != "/api/users" {
+		t.Errorf("express: expected path /api/users, got %s", entries[0].Path)
+	}
+	if entries[0].Status != 200 {
+		t.Errorf("express: expected status 200, got %d", entries[0].Status)
+	}
+	if entries[0].LatencyMs != 85 {
+		t.Errorf("express: expected latency 85ms, got %d", entries[0].LatencyMs)
+	}
+}
+
+func TestParseAll_CustomFieldMap(t *testing.T) {
+	t.Parallel()
+
+	// Fully custom schema.
+	lines := []string{
+		`{"ts":"2026-05-08T14:00:01Z","verb":"GET","endpoint":"/health","code":200,"dur":33}`,
+	}
+
+	fm := models.FieldMap{
+		Timestamp: "ts",
+		Method:    "verb",
+		Path:      "endpoint",
+		Status:    "code",
+		LatencyMs: "dur",
+	}
+	p := parser.New(fm)
+	entries, malformed := p.ParseAll(makeChannel(lines))
+
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Path != "/health" {
+		t.Errorf("custom: expected path /health, got %s", entries[0].Path)
+	}
+	if entries[0].Status != 200 {
+		t.Errorf("custom: expected status 200, got %d", entries[0].Status)
+	}
+	if entries[0].LatencyMs != 33 {
+		t.Errorf("custom: expected latency 33ms, got %d", entries[0].LatencyMs)
+	}
+}
+
+func TestParseAll_FloatLatency_ConvertedFromSeconds(t *testing.T) {
+	t.Parallel()
+
+	// Float latency is treated as seconds and converted to ms.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/api","status":200,"latency_ms":0.250}`,
+	}
+
+	entries, _ := defaultParser().ParseAll(makeChannel(lines))
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	// 0.250 seconds → 250ms
+	if entries[0].LatencyMs != 250 {
+		t.Errorf("expected latency 250ms from 0.250s, got %d", entries[0].LatencyMs)
+	}
+}
+
+func TestParseAll_IntegerLatency_UsedDirectly(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/api","status":200,"latency_ms":500}`,
+	}
+
+	entries, _ := defaultParser().ParseAll(makeChannel(lines))
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].LatencyMs != 500 {
+		t.Errorf("expected latency 500ms, got %d", entries[0].LatencyMs)
+	}
+}
+
+func TestParseAll_GinPreset(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"time":"2026-05-08T14:00:01Z","method":"GET","path":"/ping","status":200,"latency":5}`,
+	}
+
+	fm, _ := models.PresetFieldMap(models.PresetGin)
+	p := parser.New(fm)
+	entries, malformed := p.ParseAll(makeChannel(lines))
+
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].LatencyMs != 5 {
+		t.Errorf("gin: expected latency 5ms, got %d", entries[0].LatencyMs)
+	}
+}
+
+func TestParseAll_SpringPreset(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","uri":"/actuator/health","status":200,"duration":12}`,
+	}
+
+	fm, _ := models.PresetFieldMap(models.PresetSpring)
+	p := parser.New(fm)
+	entries, malformed := p.ParseAll(makeChannel(lines))
+
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Path != "/actuator/health" {
+		t.Errorf("spring: expected path /actuator/health, got %s", entries[0].Path)
 	}
 }
