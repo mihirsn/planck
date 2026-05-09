@@ -1,0 +1,31 @@
+{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/login","status":200,"latency_ms":45}
+{"timestamp":"2026-05-08T14:00:03Z","method":"POST","path":"/invoice","status":201,"latency_ms":130}
+{"timestamp":"2026-05-08T14:00:05Z","method":"GET","path":"/dashboard","status":200,"latency_ms":72}
+{"timestamp":"2026-05-08T14:00:08Z","method":"POST","path":"/checkout","status":200,"latency_ms":980}
+{"timestamp":"2026-05-08T14:00:10Z","method":"GET","path":"/login","status":200,"latency_ms":41}
+{"timestamp":"2026-05-08T14:01:02Z","method":"POST","path":"/invoice","status":500,"latency_ms":2100}
+{"timestamp":"2026-05-08T14:01:15Z","method":"GET","path":"/dashboard","status":200,"latency_ms":66}
+{"timestamp":"2026-05-08T14:01:30Z","method":"DELETE","path":"/invoice/42","status":204,"latency_ms":55}
+{"timestamp":"2026-05-08T14:01:45Z","method":"POST","path":"/checkout","status":400,"latency_ms":120}
+{"timestamp":"2026-05-08T14:02:00Z","method":"GET","path":"/login","status":401,"latency_ms":12}
+{"timestamp":"2026-05-08T14:02:10Z","method":"GET","path":"/login","status":200,"latency_ms":38}
+{"timestamp":"2026-05-08T14:02:20Z","method":"POST","path":"/invoice","status":201,"latency_ms":145}
+{"timestamp":"2026-05-08T14:02:35Z","method":"GET","path":"/dashboard","status":200,"latency_ms":80}
+{"timestamp":"2026-05-08T14:02:50Z","method":"POST","path":"/checkout","status":500,"latency_ms":1450}
+{"timestamp":"2026-05-08T14:03:00Z","method":"GET","path":"/login","status":200,"latency_ms":44}
+{"timestamp":"2026-05-08T15:00:05Z","method":"POST","path":"/invoice","status":201,"latency_ms":110}
+{"timestamp":"2026-05-08T15:00:20Z","method":"GET","path":"/dashboard","status":200,"latency_ms":68}
+{"timestamp":"2026-05-08T15:00:35Z","method":"POST","path":"/checkout","status":200,"latency_ms":890}
+{"timestamp":"2026-05-08T15:01:00Z","method":"GET","path":"/login","status":200,"latency_ms":39}
+{"timestamp":"2026-05-08T15:01:15Z","method":"POST","path":"/invoice","status":422,"latency_ms":95}
+{"timestamp":"2026-05-08T15:01:30Z","method":"GET","path":"/dashboard","status":200,"latency_ms":75}
+{"timestamp":"2026-05-08T15:01:45Z","method":"POST","path":"/checkout","status":200,"latency_ms":1200}
+{"timestamp":"2026-05-08T15:02:10Z","method":"GET","path":"/login","status":200,"latency_ms":43}
+{"timestamp":"2026-05-08T15:02:25Z","method":"POST","path":"/invoice","status":201,"latency_ms":125}
+{"timestamp":"2026-05-08T15:02:40Z","method":"GET","path":"/dashboard","status":404,"latency_ms":15}
+this is a malformed line that should be skipped
+{"timestamp":"2026-05-08T15:03:00Z","method":"GET","path":"/login","status":200,"latency_ms":42}
+{"timestamp":"2026-05-08T15:03:15Z","method":"POST","path":"/invoice","status":201,"latency_ms":140}
+{"timestamp":"2026-05-08T15:03:30Z","method":"GET","path":"/dashboard","status":200,"latency_ms":71}
+{"timestamp":"2026-05-08T15:03:45Z","method":"POST","path":"/checkout","status":500,"latency_ms":1980}
+{"invalid json line

@@ -1,0 +1,66 @@
+version: 2
+
+project_name: planck
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: planck
+    main: ./
+    binary: planck
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/mihirsn/planck/cmd.version={{.Version}}
+      - -X github.com/mihirsn/planck/cmd.commit={{.Commit}}
+      - -X github.com/mihirsn/planck/cmd.date={{.Date}}
+
+archives:
+  - id: planck
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: mihirsn
+    name: planck
+  name_template: "v{{ .Version }}"
+  footer: |
+    ## Installation
+
+    **macOS / Linux (curl)**
+    ```bash
+    curl -sSL https://github.com/mihirsn/planck/releases/download/{{ .Tag }}/planck_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m).tar.gz | tar -xz && sudo mv planck /usr/local/bin/
+    ```
+
+    **Direct download**: See the assets below for your platform.

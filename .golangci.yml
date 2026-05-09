@@ -1,0 +1,35 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck       # Checks unchecked errors
+    - gosimple       # Simplification suggestions
+    - govet          # Reports suspicious code
+    - ineffassign    # Detects ineffectual assignments
+    - staticcheck    # Advanced static analysis
+    - unused         # Checks for unused code
+    - gofmt          # Checks code formatting
+    - goimports      # Checks import ordering
+    - misspell       # Checks for common spelling mistakes
+    - revive         # Fast, configurable linter (replaces golint)
+    - godot          # Checks doc comment format
+    - noctx          # Finds HTTP requests without context
+    - bodyclose      # Checks HTTP response body is closed
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+  godot:
+    scope: declarations
+    capital: false
+
+issues:
+  exclude-rules:
+    # Test files can use more permissive patterns
+    - path: _test\.go
+      linters:
+        - errcheck
+        - godot

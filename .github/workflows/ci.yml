@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build, Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Run tests with coverage (internal packages only)
+        run: go test ./internal/... -coverprofile=coverage.out -covermode=atomic -v
+
+      - name: Check coverage threshold (90%) — internal packages
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{gsub(/%/, "", $3); print int($3)}')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "${COVERAGE}" -lt "90" ]; then
+            echo "❌ Coverage ${COVERAGE}% is below the required 90%"
+            exit 1
+          else
+            echo "✅ Coverage ${COVERAGE}% meets the 90% threshold"
+          fi
+
+      - name: Upload coverage to artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
