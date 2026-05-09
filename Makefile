@@ -15,6 +15,15 @@ build:
 run:
 	$(GO) run . $(ARGS)
 
+## hooks: install git hooks (run once after cloning)
+hooks:
+	git config core.hooksPath .githooks
+	@echo "✅ Git hooks installed. gofmt will run automatically on commit."
+
+## fmt: format all Go source files
+fmt:
+	$(GO) fmt ./...
+
 ## test: run all unit tests
 test:
 	$(GO) test ./... -v

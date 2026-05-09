@@ -1,0 +1,26 @@
+#!/bin/sh
+# Planck pre-commit hook
+# Automatically formats staged Go files with gofmt before every commit.
+# Install with: make hooks
+
+set -e
+
+# Find staged .go files (added, copied, modified — not deleted).
+STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+
+if [ -z "$STAGED_GO_FILES" ]; then
+  exit 0
+fi
+
+# Check if any staged Go files need formatting.
+UNFORMATTED=$(gofmt -l $STAGED_GO_FILES)
+
+if [ -n "$UNFORMATTED" ]; then
+  echo "⚛️  Planck pre-commit: formatting Go files..."
+  gofmt -w $UNFORMATTED
+  git add $UNFORMATTED
+  echo "✅ Formatted and re-staged:"
+  for f in $UNFORMATTED; do
+    echo "   $f"
+  done
+fi

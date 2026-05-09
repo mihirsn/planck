@@ -26,6 +26,7 @@ Before adding a feature, ask: *Does this belong in a single-binary CLI tool?* If
 git clone https://github.com/mihirsn/planck.git
 cd planck
 go mod tidy
+make hooks   # install git pre-commit hook (auto-formats Go files on commit)
 make build
 ```
 
@@ -48,6 +49,7 @@ make run ARGS="analyze sample-logs/app.log"
 4. **Write tests** — we enforce ≥ 90% test coverage
 5. **Run the full check suite**:
    ```bash
+   make fmt            # or just commit — the pre-commit hook does this automatically
    make test
    make coverage-check
    make lint
