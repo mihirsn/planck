@@ -338,4 +338,4 @@ It's a sharp, focused tool for developers who want answers quickly.
 
 ## License
 
-[MIT](LICENSE) © 2026 Mihir Naik
+[MIT](LICENSE)
