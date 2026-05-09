@@ -95,6 +95,31 @@ Analysis complete.
 
 ---
 
+## Known Limitations
+
+### Memory usage scales with log file size
+
+Planck currently loads all parsed log entries into memory before computing metrics. This works well for typical log volumes but can be a concern for very large log files on memory-constrained servers (e.g. a t2.micro with 1 GB RAM).
+
+**Rule of thumb**: Planck comfortably handles log files up to ~100k entries on any modern machine. Beyond that, use the workarounds below.
+
+**Workarounds (available now):**
+
+```bash
+# Docker: only fetch the last 5000 lines
+planck analyze --docker my-api --tail 5000
+
+# Docker: only fetch logs from the last 2 hours
+planck analyze --docker my-api --since 2h
+
+# File: use tail before analyzing
+tail -n 10000 /var/log/app.log | planck analyze /dev/stdin
+```
+
+**Planned fix (V1.3):** A streaming accumulator engine that processes one log entry at a time without building an in-memory slice. See [Roadmap](#roadmap) for details.
+
+---
+
 ## Installation
 
 ### Download a release binary (recommended)
@@ -164,7 +189,7 @@ planck analyze app.log --slow 3     # show 3 slowest endpoints (default: 5)
 
 Planck reads **one JSON object per line** ([JSON Lines](https://jsonlines.org/) format).
 
-> **Note on log format**: Planck currently requires a specific JSON schema (described below). Different frameworks use different field names — we know. Field aliases and custom schema mapping are planned for **V1.2**. In the meantime, the sections below show how to configure popular frameworks to emit Planck-compatible logs with minimal setup.
+> **Note on log format**: Planck currently requires a specific JSON schema (described below). Use `--preset` or `--field-*` flags to adapt Planck to your existing log format — see [Field mapping flags](#field-mapping-flags) for details.
 
 ```json
 {"timestamp":"2026-05-08T14:05:00Z","method":"POST","path":"/invoice","status":200,"latency_ms":120}
@@ -340,10 +365,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 
 ## Roadmap
 
-### V1.2 (planned)
-- [ ] **Field mapping** — support non-standard log schemas via a config file (`.planck.yml`), mapping your field names to Planck's internal model
-- [ ] `--filter-status` flag — analyze only errors or specific status codes  
+### V1.2 (in progress)
+- [x] **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, Spring Boot
+- [x] **Custom field flags** — `--field-*` flags to map any JSON schema to Planck's model
+- [ ] `--filter-status` flag — analyze only errors or specific status codes
 - [ ] `--since` / `--until` for file-based logs (timestamp range filtering)
+
+### V1.3 (planned)
+- [ ] **Streaming accumulator engine** — eliminate the current memory bottleneck.
+  Currently Planck buffers all log entries into memory before computing metrics.
+  V1.3 will replace this with a per-endpoint accumulator that processes one entry at a time:
+  - All counters (request count, error count, traffic by hour) become O(1) per entry.
+  - Latency storage is **capped per endpoint** (default: 10,000 samples) — enough for statistically accurate P95 computation on any real-world service, while bounding memory to a fixed ~4 MB regardless of log file size.
+  - The result: Planck will handle arbitrarily large log files on a 1 GB t2.micro without breaking a sweat.
+- [ ] `--latency-samples N` — configure the per-endpoint latency cap (default: 10,000)
 
 ### V2.0 (future)
 - [ ] Live log streaming (`planck tail`)
