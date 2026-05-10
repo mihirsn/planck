@@ -374,7 +374,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 ### V1.2 (in progress)
 - [x] **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, Spring Boot
 - [x] **Custom field flags** — `--field-*` flags to map any JSON schema to Planck's model
-- [ ] `--filter-status` flag — analyze only errors or specific status codes
+- [x] **`--scan-json` flag** — strip text prefixes (e.g. Python's `INFO:logger:{...}`) before parsing
+- [ ] **`--exclude-path` flag** — exclude URL patterns from analysis (e.g. `--exclude-path /health --exclude-path /metrics`). Supports prefix matching and exact paths. Useful to filter out health checks and internal endpoints that would otherwise dominate the top-endpoints list.
+- [ ] **`--since` days support** — allow `--since 3d` as a shorthand for `--since 72h`. Docker's `--since` flag does not natively support days, so Planck will convert `Nd` → `N*24h` before passing to Docker.
+- [ ] `--filter-status` flag — analyze only specific status codes (e.g. `--filter-status 5xx`)
 - [ ] `--since` / `--until` for file-based logs (timestamp range filtering)
 
 ### V1.3 (planned)
