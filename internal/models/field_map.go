@@ -90,8 +90,9 @@ var presets = map[string]FieldMap{
 	},
 
 	// Spring Boot with a custom JSON HTTP access log filter.
+	// Uses @timestamp as emitted by logstash-logback-encoder.
 	PresetSpring: {
-		Timestamp: "timestamp",
+		Timestamp: "@timestamp",
 		Method:    "method",
 		Path:      "uri",
 		Status:    "status",

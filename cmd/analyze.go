@@ -35,6 +35,9 @@ type analyzeFlags struct {
 	fieldPath      string
 	fieldStatus    string
 	fieldLatency   string
+
+	// Parsing behaviour.
+	scanJSON bool
 }
 
 var flags analyzeFlags
@@ -109,6 +112,10 @@ func init() {
 	analyzeCmd.Flags().StringVar(&flags.fieldStatus, "field-status", "", "JSON key for the HTTP status code field (overrides preset)")
 	analyzeCmd.Flags().StringVar(&flags.fieldLatency, "field-latency", "", "JSON key for the latency field (overrides preset)")
 
+	// Parsing behaviour flags.
+	analyzeCmd.Flags().BoolVar(&flags.scanJSON, "scan-json", false,
+		"Scan each line for the first '{' before parsing (useful for logs with text prefixes like 'INFO:logger:{...}')")
+
 	rootCmd.AddCommand(analyzeCmd)
 }
 
@@ -154,20 +161,28 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to open log source: %w", err)
 	}
 
-	p := parser.New(fieldMap)
-	entries, malformed := p.ParseAll(lineCh)
+	p := parser.New(fieldMap).SetScanJSON(flags.scanJSON)
+	result := p.ParseAll(lineCh)
 
-	if len(entries) == 0 {
+	if len(result.Entries) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "No valid log entries found.")
+		if result.PrefixedJSON > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(),
+				"\nHint: %d line(s) contained JSON prefixed with text (e.g. \"INFO:logger:{...}\").\n"+
+					"      Add --scan-json to strip the prefix and parse these lines.\n"+
+					"      Or configure your logger with propagate=False (Python) to emit bare JSON.\n",
+				result.PrefixedJSON,
+			)
+		}
 		return nil
 	}
 
 	// Calculate metrics.
-	report := metrics.Calculate(entries, metrics.Options{
+	report := metrics.Calculate(result.Entries, metrics.Options{
 		TopN:       flags.top,
 		SlowN:      flags.slow,
 		SourceName: sourceName,
-		Malformed:  malformed,
+		Malformed:  result.Malformed,
 	})
 
 	// Render output.

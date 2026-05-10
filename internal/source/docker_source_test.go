@@ -103,3 +103,58 @@ func TestDockerSource_Stream_ErrorOnStart(t *testing.T) {
 		t.Error("expected error when command cannot start, got nil")
 	}
 }
+
+// TestDockerSource_Stream_ReadsStderr verifies that Stream captures lines
+// written to stderr. This is critical because `docker logs` sends container
+// output to stderr by default, not stdout.
+func TestDockerSource_Stream_ReadsStderr(t *testing.T) {
+	t.Parallel()
+
+	// sh -c 'echo ... >&2' writes to stderr only.
+	fakeBuilder := func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("sh", "-c", "echo stderr-line-one >&2 && echo stderr-line-two >&2")
+	}
+
+	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+
+	ch, err := src.Stream()
+	if err != nil {
+		t.Fatalf("Stream() error: %v", err)
+	}
+
+	var lines []string
+	for l := range ch {
+		lines = append(lines, l)
+	}
+
+	if len(lines) < 2 {
+		t.Errorf("expected 2 lines from stderr, got %d: %v", len(lines), lines)
+	}
+}
+
+// TestDockerSource_Stream_MergesStdoutAndStderr verifies that Stream captures
+// lines from both stdout and stderr in a single pass.
+func TestDockerSource_Stream_MergesStdoutAndStderr(t *testing.T) {
+	t.Parallel()
+
+	// Write one line to stdout and one to stderr.
+	fakeBuilder := func(_ string, _ ...string) *exec.Cmd {
+		return exec.Command("sh", "-c", "echo stdout-line && echo stderr-line >&2")
+	}
+
+	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+
+	ch, err := src.Stream()
+	if err != nil {
+		t.Fatalf("Stream() error: %v", err)
+	}
+
+	var lines []string
+	for l := range ch {
+		lines = append(lines, l)
+	}
+
+	if len(lines) < 2 {
+		t.Errorf("expected at least 2 lines (stdout + stderr), got %d: %v", len(lines), lines)
+	}
+}

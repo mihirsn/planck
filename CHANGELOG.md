@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-05-10
+
+### Added
+- **`--scan-json` flag** — scans each log line for the first `{` before parsing, transparently handling logs with text prefixes (e.g. Python's default `INFO:logger:{...}` format)
+- **Prefixed JSON hint** — when no valid entries are found and lines appear to contain JSON with a text prefix, Planck now shows a clear hint suggesting `--scan-json` or `propagate=False`
+
+### Fixed
+- **Spring Boot preset `@timestamp`** — corrected the Spring preset's timestamp field from `timestamp` to `@timestamp`, matching the field name used by `logstash-logback-encoder` (the most common Spring Boot JSON logging library)
+
 ## [0.1.1] - 2026-05-09
 
 ### Added

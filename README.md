@@ -318,15 +318,21 @@ Individual `--field-*` flags always override the `--preset` value.
 | `--field-status` | `status` | JSON key for the HTTP status code |
 | `--field-latency` | `latency_ms` | JSON key for the request latency |
 
+### Parsing behaviour flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--scan-json` | `false` | Scan each line for the first `{` before parsing. Useful when logs have a text prefix (e.g. Python's `INFO:logger:{...}` format). |
+
 ### Built-in presets
 
 | Preset | Framework | `--field-path` | `--field-status` | `--field-latency` | Notes |
 |---|---|---|---|---|---|
-| `fastapi` | FastAPI / uvicorn | `path` | `status_code` | `duration` | latency auto-converted from seconds |
+| `fastapi` | FastAPI / uvicorn | `path` | `status_code` | `duration` | latency auto-converted from float seconds |
 | `express` | Express.js + morgan | `url` | `statusCode` | `responseTime` | |
 | `gin` | Go Gin | `path` | `status` | `latency` | |
 | `echo` | Go Echo | `uri` | `status` | `latency` | |
-| `spring` | Spring Boot | `uri` | `status` | `duration` | |
+| `spring` | Spring Boot | `uri` | `status` | `duration` | uses `@timestamp` (logstash-logback-encoder) |
 
 ---
 

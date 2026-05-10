@@ -2,11 +2,10 @@ package source
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 // DockerSource reads log lines from a running Docker container by executing
@@ -50,18 +49,22 @@ func newDockerSourceWithBuilder(container string, tail int, since string, builde
 }
 
 // Stream executes `docker logs` and emits each output line through a channel.
-// stderr is captured separately to produce clean user-facing error messages.
+// Both stdout and stderr are read — Docker sends container logs to stderr by
+// default, but some log drivers or configurations use stdout. Merging both
+// ensures all lines are captured regardless of which stream they arrive on.
 // The channel is closed once all lines have been emitted.
 func (d *DockerSource) Stream() (<-chan string, error) {
 	args := d.buildArgs()
 	cmd := d.cmdBuilder("docker", args...) //nolint:gosec // container name is validated by docker
 
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker stderr pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -73,19 +76,15 @@ func (d *DockerSource) Stream() (<-chan string, error) {
 	go func() {
 		defer close(ch)
 
-		scanner := bufio.NewScanner(stdout)
+		// Merge stdout and stderr so lines from either stream are captured.
+		combined := io.MultiReader(stdout, stderr)
+		scanner := bufio.NewScanner(combined)
 		for scanner.Scan() {
 			ch <- scanner.Text()
 		}
 
-		if err := cmd.Wait(); err != nil {
-			errMsg := strings.TrimSpace(stderr.String())
-			if strings.Contains(errMsg, "No such container") {
-				fmt.Printf("\nContainer %q not found.\n", d.container)
-			}
-			// Other errors after partial streaming are silently ignored —
-			// this matches `docker logs` behavior on stopped containers.
-		}
+		// Ignore wait error — partial streaming on stopped containers is fine.
+		_ = cmd.Wait()
 	}()
 
 	return ch, nil
