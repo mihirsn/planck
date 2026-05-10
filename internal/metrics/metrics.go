@@ -22,6 +22,9 @@ type Options struct {
 
 	// Malformed is the number of log lines that could not be parsed.
 	Malformed int
+
+	// Excluded is the number of log entries filtered out by --exclude-path.
+	Excluded int
 }
 
 // EndpointStat holds aggregated statistics for a single endpoint path.
@@ -69,6 +72,9 @@ type Report struct {
 
 	// MalformedLines is the count of lines that were skipped due to parsing errors.
 	MalformedLines int `json:"malformed_lines"`
+
+	// ExcludedEntries is the count of entries filtered out by --exclude-path.
+	ExcludedEntries int `json:"excluded_entries"`
 
 	// TopEndpoints is the list of most-requested endpoints (up to Options.TopN).
 	TopEndpoints []EndpointStat `json:"top_endpoints"`
@@ -122,13 +128,14 @@ func Calculate(entries []models.LogEntry, opts Options) Report {
 	stats := buildStats(accMap, len(entries))
 
 	return Report{
-		SourceName:     opts.SourceName,
-		TotalRequests:  len(entries),
-		MalformedLines: opts.Malformed,
-		TopEndpoints:   topN(stats, opts.TopN),
-		TrafficByHour:  buildHourly(hourMap),
-		ErrorEndpoints: errorEndpoints(stats),
-		SlowEndpoints:  slowN(stats, opts.SlowN),
+		SourceName:      opts.SourceName,
+		TotalRequests:   len(entries),
+		MalformedLines:  opts.Malformed,
+		ExcludedEntries: opts.Excluded,
+		TopEndpoints:    topN(stats, opts.TopN),
+		TrafficByHour:   buildHourly(hourMap),
+		ErrorEndpoints:  errorEndpoints(stats),
+		SlowEndpoints:   slowN(stats, opts.SlowN),
 	}
 }
 

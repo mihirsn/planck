@@ -35,6 +35,11 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 			colorYellow, report.MalformedLines, colorReset)
 	}
 
+	if report.ExcludedEntries > 0 {
+		fmt.Fprintf(w, "%s⊘  Excluded %d entries matching --exclude-path filters.%s\n",
+			colorGray, report.ExcludedEntries, colorReset)
+	}
+
 	// Top endpoints.
 	if len(report.TopEndpoints) > 0 {
 		fmt.Fprintln(w)

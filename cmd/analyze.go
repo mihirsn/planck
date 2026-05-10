@@ -37,7 +37,8 @@ type analyzeFlags struct {
 	fieldLatency   string
 
 	// Parsing behaviour.
-	scanJSON bool
+	scanJSON     bool
+	excludePaths []string
 }
 
 var flags analyzeFlags
@@ -115,6 +116,8 @@ func init() {
 	// Parsing behaviour flags.
 	analyzeCmd.Flags().BoolVar(&flags.scanJSON, "scan-json", false,
 		"Scan each line for the first '{' before parsing (useful for logs with text prefixes like 'INFO:logger:{...}')")
+	analyzeCmd.Flags().StringArrayVar(&flags.excludePaths, "exclude-path", nil,
+		"Exclude entries whose path starts with this prefix (repeatable: --exclude-path /health --exclude-path /metrics)")
 
 	rootCmd.AddCommand(analyzeCmd)
 }
@@ -161,7 +164,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to open log source: %w", err)
 	}
 
-	p := parser.New(fieldMap).SetScanJSON(flags.scanJSON)
+	p := parser.New(fieldMap).SetScanJSON(flags.scanJSON).SetExcludePaths(flags.excludePaths)
 	result := p.ParseAll(lineCh)
 
 	if len(result.Entries) == 0 {
@@ -183,6 +186,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		SlowN:      flags.slow,
 		SourceName: sourceName,
 		Malformed:  result.Malformed,
+		Excluded:   result.Excluded,
 	})
 
 	// Render output.

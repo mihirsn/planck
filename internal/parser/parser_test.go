@@ -429,3 +429,89 @@ func TestParseAll_PrefixedJSON_NotSetWhenScanEnabled(t *testing.T) {
 		t.Errorf("expected PrefixedJSON=0 when scan-json is on, got %d", result.PrefixedJSON)
 	}
 }
+
+// --- exclude-path tests ---
+
+func TestParseAll_ExcludePath_PrefixMatch(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/health","status":200,"latency_ms":1}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/health/check","status":200,"latency_ms":1}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","path":"/api/orders","status":200,"latency_ms":45}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetExcludePaths([]string{"/health"})
+	result := p.ParseAll(makeChannel(lines))
+
+	// /health and /health/check should be excluded, /api/orders should remain.
+	if len(result.Entries) != 1 {
+		t.Errorf("expected 1 entry after exclusion, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Path != "/api/orders" {
+		t.Errorf("expected /api/orders, got %s", result.Entries[0].Path)
+	}
+	if result.Excluded != 2 {
+		t.Errorf("expected Excluded=2, got %d", result.Excluded)
+	}
+}
+
+func TestParseAll_ExcludePath_MultiplePatterns(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/health","status":200,"latency_ms":1}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/metrics","status":200,"latency_ms":1}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","path":"/api/v1/internal/cleanup","status":200,"latency_ms":5}`,
+		`{"timestamp":"2026-05-08T14:00:04Z","path":"/api/orders","status":200,"latency_ms":45}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetExcludePaths([]string{"/health", "/metrics", "/api/v1/internal"})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Errorf("expected 1 entry after exclusion, got %d", len(result.Entries))
+	}
+	if result.Excluded != 3 {
+		t.Errorf("expected Excluded=3, got %d", result.Excluded)
+	}
+}
+
+func TestParseAll_ExcludePath_NotCountedAsMalformed(t *testing.T) {
+	t.Parallel()
+
+	// Excluded entries must NOT increment the Malformed counter.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/health","status":200,"latency_ms":1}`,
+		`not json`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetExcludePaths([]string{"/health"})
+	result := p.ParseAll(makeChannel(lines))
+
+	if result.Excluded != 1 {
+		t.Errorf("expected Excluded=1, got %d", result.Excluded)
+	}
+	if result.Malformed != 1 {
+		t.Errorf("expected Malformed=1 (only for the non-JSON line), got %d", result.Malformed)
+	}
+}
+
+func TestParseAll_ExcludePath_EmptyPaths_NoEffect(t *testing.T) {
+	t.Parallel()
+
+	// Empty exclude list should not affect any entries.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/health","status":200,"latency_ms":1}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetExcludePaths([]string{})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Errorf("expected 1 entry with empty exclude list, got %d", len(result.Entries))
+	}
+	if result.Excluded != 0 {
+		t.Errorf("expected Excluded=0, got %d", result.Excluded)
+	}
+}

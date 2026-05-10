@@ -23,6 +23,10 @@ type ParseResult struct {
 	// have been parsed successfully with --scan-json enabled.
 	// Only populated when scan-json mode is disabled.
 	PrefixedJSON int
+
+	// Excluded is the count of entries skipped because their path matched one
+	// of the --exclude-path prefixes. These are intentionally filtered, not errors.
+	Excluded int
 }
 
 // Parser reads raw log lines and converts them into LogEntry structs
@@ -31,8 +35,9 @@ type ParseResult struct {
 // Malformed lines (invalid JSON, missing required fields) are counted
 // but do not halt processing.
 type Parser struct {
-	fields   models.FieldMap
-	scanJSON bool
+	fields       models.FieldMap
+	scanJSON     bool
+	excludePaths []string
 }
 
 // New returns a Parser that maps log fields using the given FieldMap.
@@ -52,6 +57,19 @@ func (p *Parser) SetScanJSON(enabled bool) *Parser {
 	return p
 }
 
+// SetExcludePaths sets a list of path prefixes to exclude from analysis.
+// Any parsed log entry whose path starts with one of these prefixes is
+// silently dropped and counted in ParseResult.Excluded.
+//
+// Example: SetExcludePaths([]string{"/health", "/metrics"})
+// will exclude /health, /health/check, /metrics, /metrics/prometheus, etc.
+//
+// Returns the Parser for method chaining.
+func (p *Parser) SetExcludePaths(paths []string) *Parser {
+	p.excludePaths = paths
+	return p
+}
+
 // ParseAll consumes all lines from ch and returns a ParseResult containing
 // the parsed entries and diagnostic counters.
 func (p *Parser) ParseAll(ch <-chan string) ParseResult {
@@ -66,10 +84,24 @@ func (p *Parser) ParseAll(ch <-chan string) ParseResult {
 			}
 			continue
 		}
+		if p.isExcluded(entry.Path) {
+			result.Excluded++
+			continue
+		}
 		result.Entries = append(result.Entries, entry)
 	}
 
 	return result
+}
+
+// isExcluded reports whether path matches any of the configured exclude prefixes.
+func (p *Parser) isExcluded(path string) bool {
+	for _, prefix := range p.excludePaths {
+		if prefix != "" && strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseLine parses a single log line. It returns:
