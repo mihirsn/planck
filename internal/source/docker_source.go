@@ -3,9 +3,9 @@ package source
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os/exec"
 	"strconv"
+	"sync"
 )
 
 // DockerSource reads log lines from a running Docker container by executing
@@ -49,9 +49,9 @@ func newDockerSourceWithBuilder(container string, tail int, since string, builde
 }
 
 // Stream executes `docker logs` and emits each output line through a channel.
-// Both stdout and stderr are read — Docker sends container logs to stderr by
-// default, but some log drivers or configurations use stdout. Merging both
-// ensures all lines are captured regardless of which stream they arrive on.
+// Both stdout and stderr are read concurrently. Docker sends container logs
+// to stderr by default, but some log drivers use stdout. Reading them
+// concurrently prevents deadlocks if one stream's OS buffer fills up.
 // The channel is closed once all lines have been emitted.
 func (d *DockerSource) Stream() (<-chan string, error) {
 	args := d.buildArgs()
@@ -72,17 +72,31 @@ func (d *DockerSource) Stream() (<-chan string, error) {
 	}
 
 	ch := make(chan string)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
+	// Read stdout
 	go func() {
-		defer close(ch)
-
-		// Merge stdout and stderr so lines from either stream are captured.
-		combined := io.MultiReader(stdout, stderr)
-		scanner := bufio.NewScanner(combined)
+		defer wg.Done()
+		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			ch <- scanner.Text()
 		}
+	}()
 
+	// Read stderr
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			ch <- scanner.Text()
+		}
+	}()
+
+	// Wait for both streams to finish, then close the channel.
+	go func() {
+		wg.Wait()
+		close(ch)
 		// Ignore wait error — partial streaming on stopped containers is fine.
 		_ = cmd.Wait()
 	}()
