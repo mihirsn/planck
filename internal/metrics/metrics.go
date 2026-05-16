@@ -25,6 +25,9 @@ type Options struct {
 
 	// Excluded is the number of log entries filtered out by --exclude-path.
 	Excluded int
+
+	// Filtered is the number of entries filtered out by --filter-status or time range.
+	Filtered int
 }
 
 // EndpointStat holds aggregated statistics for a single endpoint path.
@@ -75,6 +78,9 @@ type Report struct {
 
 	// ExcludedEntries is the count of entries filtered out by --exclude-path.
 	ExcludedEntries int `json:"excluded_entries"`
+
+	// FilteredEntries is the count of entries dropped by --filter-status or time range.
+	FilteredEntries int `json:"filtered_entries"`
 
 	// TopEndpoints is the list of most-requested endpoints (up to Options.TopN).
 	TopEndpoints []EndpointStat `json:"top_endpoints"`
@@ -132,6 +138,7 @@ func Calculate(entries []models.LogEntry, opts Options) Report {
 		TotalRequests:   len(entries),
 		MalformedLines:  opts.Malformed,
 		ExcludedEntries: opts.Excluded,
+		FilteredEntries: opts.Filtered,
 		TopEndpoints:    topN(stats, opts.TopN),
 		TrafficByHour:   buildHourly(hourMap),
 		ErrorEndpoints:  errorEndpoints(stats),

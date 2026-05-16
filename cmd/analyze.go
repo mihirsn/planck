@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -39,6 +40,8 @@ type analyzeFlags struct {
 	// Parsing behaviour.
 	scanJSON     bool
 	excludePaths []string
+	filterStatus string
+	until        string
 }
 
 var flags analyzeFlags
@@ -118,6 +121,10 @@ func init() {
 		"Scan each line for the first '{' before parsing (useful for logs with text prefixes like 'INFO:logger:{...}')")
 	analyzeCmd.Flags().StringArrayVar(&flags.excludePaths, "exclude-path", nil,
 		"Exclude entries whose path starts with this prefix (repeatable: --exclude-path /health --exclude-path /metrics)")
+	analyzeCmd.Flags().StringVar(&flags.filterStatus, "filter-status", "",
+		"Only include entries matching this status pattern: 2xx, 3xx, 4xx, 5xx, or an exact code (e.g. 200, 404)")
+	analyzeCmd.Flags().StringVar(&flags.until, "until", "",
+		"Exclude entries after this time. Accepts a duration (e.g. 1h, 30m, 3d) or RFC3339 timestamp")
 
 	rootCmd.AddCommand(analyzeCmd)
 }
@@ -164,7 +171,26 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to open log source: %w", err)
 	}
 
-	p := parser.New(fieldMap).SetScanJSON(flags.scanJSON).SetExcludePaths(flags.excludePaths)
+	p := parser.New(fieldMap).
+		SetScanJSON(flags.scanJSON).
+		SetExcludePaths(flags.excludePaths).
+		SetStatusFilter(flags.filterStatus)
+
+	// Apply time range filtering for file-based sources.
+	// (Docker sources already pre-filter via --since passed to `docker logs`;
+	// applying it at the parser level too ensures --since and --until are
+	// consistent across both source types.)
+	sinceTime, err := parseSinceAsTime(flags.since)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --since value %q: %v\n", flags.since, err)
+		return nil //nolint:nilerr
+	}
+	untilTime, err := parseSinceAsTime(flags.until)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --until value %q: %v\n", flags.until, err)
+		return nil //nolint:nilerr
+	}
+	p.SetTimeRange(sinceTime, untilTime)
 	result := p.ParseAll(lineCh)
 
 	if len(result.Entries) == 0 {
@@ -187,6 +213,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		SourceName: sourceName,
 		Malformed:  result.Malformed,
 		Excluded:   result.Excluded,
+		Filtered:   result.Filtered,
 	})
 
 	// Render output.
@@ -229,4 +256,41 @@ func buildFieldMap() (models.FieldMap, error) {
 	}
 
 	return fm, nil
+}
+
+// parseSinceAsTime converts a --since / --until string to an absolute time.Time.
+// Supported formats (in order of attempt):
+//
+//	"3d"               → now minus 3 days   (Planck extension, docker logs doesn't support days)
+//	"1h", "30m", "5s"  → now minus the Go duration
+//	RFC3339 timestamp  → parsed directly as an absolute time
+//
+// Returns a zero time.Time and nil error when s is empty (no bound set).
+func parseSinceAsTime(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+
+	// Days shorthand: "3d" → 72h ago.
+	if strings.HasSuffix(s, "d") {
+		n, err := fmt.Sscanf(s[:len(s)-1], "%d", new(int))
+		_ = n
+		var days int
+		if _, err2 := fmt.Sscanf(s, "%dd", &days); err2 == nil && days > 0 {
+			return time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour), nil
+		}
+		_ = err
+	}
+
+	// Go duration: "1h", "30m", etc.
+	if d, err := time.ParseDuration(s); err == nil {
+		return time.Now().UTC().Add(-d), nil
+	}
+
+	// Absolute RFC3339 timestamp.
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+
+	return time.Time{}, fmt.Errorf("unrecognized format %q — use a duration (1h, 30m, 3d) or RFC3339 timestamp", s)
 }

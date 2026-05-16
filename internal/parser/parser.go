@@ -4,6 +4,7 @@ package parser
 import (
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,10 @@ type ParseResult struct {
 	// Excluded is the count of entries skipped because their path matched one
 	// of the --exclude-path prefixes. These are intentionally filtered, not errors.
 	Excluded int
+
+	// Filtered is the count of entries skipped by --filter-status or the time
+	// range (--since / --until). These are intentionally filtered, not errors.
+	Filtered int
 }
 
 // Parser reads raw log lines and converts them into LogEntry structs
@@ -38,6 +43,9 @@ type Parser struct {
 	fields       models.FieldMap
 	scanJSON     bool
 	excludePaths []string
+	statusFilter string    // e.g. "5xx", "4xx", "200" — empty means no filter
+	sinceTime    time.Time // zero means no lower bound
+	untilTime    time.Time // zero means no upper bound
 }
 
 // New returns a Parser that maps log fields using the given FieldMap.
@@ -70,6 +78,29 @@ func (p *Parser) SetExcludePaths(paths []string) *Parser {
 	return p
 }
 
+// SetStatusFilter restricts analysis to entries matching the given status pattern.
+// Supported patterns:
+//   - Class patterns: "2xx", "3xx", "4xx", "5xx" (matches any status in that range)
+//   - Exact codes:    "200", "404", "500" (matches a single code)
+//
+// An empty string disables filtering (all statuses are included).
+// Returns the Parser for method chaining.
+func (p *Parser) SetStatusFilter(pattern string) *Parser {
+	p.statusFilter = strings.ToLower(strings.TrimSpace(pattern))
+	return p
+}
+
+// SetTimeRange restricts analysis to entries whose timestamp falls within
+// [since, until]. A zero time.Time for either bound means "no bound".
+//
+// Entries without a parseable timestamp are never filtered by time range.
+// Returns the Parser for method chaining.
+func (p *Parser) SetTimeRange(since, until time.Time) *Parser {
+	p.sinceTime = since
+	p.untilTime = until
+	return p
+}
+
 // ParseAll consumes all lines from ch and returns a ParseResult containing
 // the parsed entries and diagnostic counters.
 func (p *Parser) ParseAll(ch <-chan string) ParseResult {
@@ -88,6 +119,10 @@ func (p *Parser) ParseAll(ch <-chan string) ParseResult {
 			result.Excluded++
 			continue
 		}
+		if p.isFiltered(entry) {
+			result.Filtered++
+			continue
+		}
 		result.Entries = append(result.Entries, entry)
 	}
 
@@ -102,6 +137,43 @@ func (p *Parser) isExcluded(path string) bool {
 		}
 	}
 	return false
+}
+
+// isFiltered reports whether an entry should be dropped by the status filter
+// or by the time range (since/until). Returns true when the entry should be skipped.
+func (p *Parser) isFiltered(entry models.LogEntry) bool {
+	// Status filter.
+	if p.statusFilter != "" && !matchesStatusFilter(entry.Status, p.statusFilter) {
+		return true
+	}
+	// Time range filter — only applied when the entry has a parseable timestamp.
+	if !entry.Timestamp.IsZero() {
+		if !p.sinceTime.IsZero() && entry.Timestamp.Before(p.sinceTime) {
+			return true
+		}
+		if !p.untilTime.IsZero() && entry.Timestamp.After(p.untilTime) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesStatusFilter reports whether status matches the given pattern.
+// Patterns: "2xx"/"3xx"/"4xx"/"5xx" for class ranges, or an exact code string.
+func matchesStatusFilter(status int, pattern string) bool {
+	switch pattern {
+	case "2xx":
+		return status >= 200 && status < 300
+	case "3xx":
+		return status >= 300 && status < 400
+	case "4xx":
+		return status >= 400 && status < 500
+	case "5xx":
+		return status >= 500 && status < 600
+	default:
+		// Treat as exact status code.
+		return strconv.Itoa(status) == pattern
+	}
 }
 
 // parseLine parses a single log line. It returns:

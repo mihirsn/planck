@@ -375,10 +375,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 - [x] **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, Spring Boot
 - [x] **Custom field flags** — `--field-*` flags to map any JSON schema to Planck's model
 - [x] **`--scan-json` flag** — strip text prefixes (e.g. Python's `INFO:logger:{...}`) before parsing
-- [ ] **`--exclude-path` flag** — exclude URL patterns from analysis (e.g. `--exclude-path /health --exclude-path /metrics`). Supports prefix matching and exact paths. Useful to filter out health checks and internal endpoints that would otherwise dominate the top-endpoints list.
-- [ ] **`--since` days support** — allow `--since 3d` as a shorthand for `--since 72h`. Docker's `--since` flag does not natively support days, so Planck will convert `Nd` → `N*24h` before passing to Docker.
-- [ ] `--filter-status` flag — analyze only specific status codes (e.g. `--filter-status 5xx`)
-- [ ] `--since` / `--until` for file-based logs (timestamp range filtering)
+- [x] **`--exclude-path` flag** — exclude URL patterns from analysis (e.g. `--exclude-path /health --exclude-path /metrics`). Supports prefix matching and exact paths.
+- [x] **`--since` days support** — `--since 3d` as a shorthand for `--since 72h`. Planck converts `Nd` → `N*24h` before passing to Docker.
+- [x] **`--filter-status` flag** — analyze only specific status codes (`2xx`, `4xx`, `5xx`, or exact like `200`, `404`)
+- [x] **`--until` flag** — exclude entries after a given time. Accepts a duration (`1h`, `3d`) or RFC3339 timestamp. Works for both Docker and file sources.
+- [x] **`--since` / `--until` for file-based logs** — timestamp range filtering applied at the parser level for log files
 
 ### V1.3 (planned)
 - [ ] **Streaming accumulator engine** — eliminate the current memory bottleneck.

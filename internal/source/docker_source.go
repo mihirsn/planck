@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -120,9 +121,29 @@ func (d *DockerSource) buildArgs() []string {
 	}
 
 	if d.since != "" {
-		args = append(args, "--since", d.since)
+		args = append(args, "--since", normalizeSince(d.since))
 	}
 
 	args = append(args, d.container)
 	return args
+}
+
+// normalizeSince converts a "days" shorthand like "3d" to an equivalent hours
+// string ("72h") that Docker's --since flag understands. All other values
+// (e.g. "1h", "30m", RFC3339 timestamps) are passed through unchanged.
+//
+// Examples:
+//
+//	"3d"  → "72h"
+//	"1h"  → "1h"   (unchanged)
+//	"30m" → "30m"  (unchanged)
+func normalizeSince(s string) string {
+	if !strings.HasSuffix(s, "d") {
+		return s
+	}
+	days, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+	if err != nil || days <= 0 {
+		return s // not a valid day count — pass through and let docker report the error
+	}
+	return strconv.Itoa(days*24) + "h"
 }

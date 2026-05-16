@@ -11,14 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.2] - 2026-05-10
+## [0.1.2] - 2026-05-16
 
 ### Added
-- **`--scan-json` flag** — scans each log line for the first `{` before parsing, transparently handling logs with text prefixes (e.g. Python's default `INFO:logger:{...}` format)
-- **Prefixed JSON hint** — when no valid entries are found and lines appear to contain JSON with a text prefix, Planck now shows a clear hint suggesting `--scan-json` or `propagate=False`
+- **`--scan-json` flag** — scans each log line for the first `{` before parsing, handling logs with text prefixes (e.g. Python's `INFO:logger:{...}` format)
+- **Prefixed JSON hint** — when no valid entries are found and lines appear to contain prefixed JSON, Planck shows a clear hint suggesting `--scan-json` or `propagate=False`
+- **`--exclude-path` flag** — exclude URL prefixes from analysis (repeatable: `--exclude-path /health --exclude-path /metrics`). Excluded count shown in report header.
+- **`--filter-status` flag** — restrict analysis to a status class (`2xx`, `3xx`, `4xx`, `5xx`) or an exact code (`200`, `404`). Filtered count shown in report header.
+- **`--since` days support** — `--since 3d` as a shorthand for `--since 72h`. Planck converts `Nd` → `N*24h` before passing to Docker since Docker does not natively support days.
+- **`--until` flag** — exclude log entries after a given time. Accepts a duration (`1h`, `3d`) or an RFC3339 absolute timestamp. Works for both Docker and file-based sources.
+- **Time range filtering for file logs** — `--since` and `--until` are now applied at the parser level, enabling timestamp-based filtering when analyzing log files.
 
 ### Fixed
-- **Spring Boot preset `@timestamp`** — corrected the Spring preset's timestamp field from `timestamp` to `@timestamp`, matching the field name used by `logstash-logback-encoder` (the most common Spring Boot JSON logging library)
+- **Docker stderr capture** — `docker logs` sends container output to stderr by default. Planck previously only read stdout, silently dropping all log lines for most containers. Both streams are now read concurrently, preventing the deadlock that occurred on containers with large log volumes.
+- **Spring Boot preset `@timestamp`** — corrected the Spring preset's timestamp field from `timestamp` to `@timestamp`, matching the field name used by `logstash-logback-encoder`.
 
 ## [0.1.1] - 2026-05-09
 

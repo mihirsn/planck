@@ -40,6 +40,11 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 			colorGray, report.ExcludedEntries, colorReset)
 	}
 
+	if report.FilteredEntries > 0 {
+		fmt.Fprintf(w, "%s⊘  Filtered %d entries by status or time range.%s\n",
+			colorGray, report.FilteredEntries, colorReset)
+	}
+
 	// Top endpoints.
 	if len(report.TopEndpoints) > 0 {
 		fmt.Fprintln(w)

@@ -515,3 +515,167 @@ func TestParseAll_ExcludePath_EmptyPaths_NoEffect(t *testing.T) {
 		t.Errorf("expected Excluded=0, got %d", result.Excluded)
 	}
 }
+
+// --- filter-status tests ---
+
+func TestParseAll_FilterStatus_ClassPattern_5xx(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/api","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/api","status":500,"latency_ms":80}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","path":"/api","status":503,"latency_ms":90}`,
+		`{"timestamp":"2026-05-08T14:00:04Z","path":"/api","status":404,"latency_ms":5}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetStatusFilter("5xx")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 5xx entries, got %d", len(result.Entries))
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2 (200 and 404), got %d", result.Filtered)
+	}
+	for _, e := range result.Entries {
+		if e.Status < 500 || e.Status >= 600 {
+			t.Errorf("unexpected non-5xx status %d in filtered result", e.Status)
+		}
+	}
+}
+
+func TestParseAll_FilterStatus_ClassPattern_4xx(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/b","status":400,"latency_ms":5}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","path":"/c","status":404,"latency_ms":5}`,
+		`{"timestamp":"2026-05-08T14:00:04Z","path":"/d","status":500,"latency_ms":90}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetStatusFilter("4xx")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 4xx entries, got %d", len(result.Entries))
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterStatus_ExactCode(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/b","status":201,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","path":"/c","status":404,"latency_ms":5}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetStatusFilter("201")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Errorf("expected 1 entry with status 201, got %d", len(result.Entries))
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2 (200 and 404), got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterStatus_EmptyFilter_NoEffect(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","path":"/b","status":500,"latency_ms":80}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetStatusFilter("")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 entries with empty filter, got %d", len(result.Entries))
+	}
+	if result.Filtered != 0 {
+		t.Errorf("expected Filtered=0, got %d", result.Filtered)
+	}
+}
+
+// --- time range (--since / --until) tests ---
+
+func TestParseAll_TimeRange_SinceFiltersOldEntries(t *testing.T) {
+	t.Parallel()
+
+	// sinceTime is between the two entries.
+	sinceTime := time.Date(2026, 5, 8, 14, 0, 30, 0, time.UTC)
+
+	lines := []string{
+		// Before sinceTime — should be filtered.
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/old","status":200,"latency_ms":10}`,
+		// After sinceTime — should be included.
+		`{"timestamp":"2026-05-08T14:01:00Z","path":"/new","status":200,"latency_ms":20}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetTimeRange(sinceTime, time.Time{})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry after --since filter, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Path != "/new" {
+		t.Errorf("expected /new, got %s", result.Entries[0].Path)
+	}
+	if result.Filtered != 1 {
+		t.Errorf("expected Filtered=1, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_TimeRange_UntilFiltersNewEntries(t *testing.T) {
+	t.Parallel()
+
+	// untilTime is between the two entries.
+	untilTime := time.Date(2026, 5, 8, 14, 0, 30, 0, time.UTC)
+
+	lines := []string{
+		// Before untilTime — should be included.
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/old","status":200,"latency_ms":10}`,
+		// After untilTime — should be filtered.
+		`{"timestamp":"2026-05-08T14:01:00Z","path":"/new","status":200,"latency_ms":20}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetTimeRange(time.Time{}, untilTime)
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry after --until filter, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Path != "/old" {
+		t.Errorf("expected /old, got %s", result.Entries[0].Path)
+	}
+	if result.Filtered != 1 {
+		t.Errorf("expected Filtered=1, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_TimeRange_ZeroTimesNoEffect(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T15:00:00Z","path":"/b","status":200,"latency_ms":20}`,
+	}
+
+	// Both zero — no filtering should happen.
+	p := parser.New(models.DefaultFieldMap()).SetTimeRange(time.Time{}, time.Time{})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 entries with zero time range, got %d", len(result.Entries))
+	}
+	if result.Filtered != 0 {
+		t.Errorf("expected Filtered=0, got %d", result.Filtered)
+	}
+}
