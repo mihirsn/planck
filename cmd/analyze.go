@@ -80,6 +80,17 @@ Examples:
 
   # Docker with options
   planck analyze --docker invoice-api --tail 1000 --since 1h
+  planck analyze --docker invoice-api --since 3d --preset fastapi
+
+  # Filter by status class or exact code
+  planck analyze app.log --filter-status 5xx
+  planck analyze --docker my-api --preset fastapi --filter-status 4xx
+
+  # Exclude noisy endpoints
+  planck analyze --docker my-api --preset fastapi --exclude-path /health --exclude-path /metrics
+
+  # Time range for file-based logs
+  planck analyze app.log --since 2h --until 2026-05-10T18:00:00Z
 
   # JSON output
   planck analyze app.log --format json | jq '.top_endpoints'`,
@@ -100,7 +111,7 @@ func init() {
 	// Source flags.
 	analyzeCmd.Flags().StringVar(&flags.docker, "docker", "", "Docker container name or ID to analyze")
 	analyzeCmd.Flags().IntVar(&flags.tail, "tail", 0, "Number of log lines to fetch from Docker (0 = all)")
-	analyzeCmd.Flags().StringVar(&flags.since, "since", "", "Fetch Docker logs since duration (e.g. 1h, 30m)")
+	analyzeCmd.Flags().StringVar(&flags.since, "since", "", "Fetch logs since this duration or timestamp (e.g. 1h, 30m, 3d). For Docker, passed to docker logs; for files, filters by entry timestamp.")
 
 	// Output flags.
 	analyzeCmd.Flags().StringVar(&flags.format, "format", "text", "Output format: text or json")
