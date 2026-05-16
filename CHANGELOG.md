@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.2] - 2026-05-16
+## [0.1.3] - 2026-05-16
 
 ### Added
 - **`--scan-json` flag** — scans each log line for the first `{` before parsing, handling logs with text prefixes (e.g. Python's `INFO:logger:{...}` format)
