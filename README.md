@@ -371,24 +371,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 
 ## Roadmap
 
-### V1.2 (in progress)
+### v0.1.2 ✅ released
 - [x] **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, Spring Boot
 - [x] **Custom field flags** — `--field-*` flags to map any JSON schema to Planck's model
 - [x] **`--scan-json` flag** — strip text prefixes (e.g. Python's `INFO:logger:{...}`) before parsing
-- [x] **`--exclude-path` flag** — exclude URL patterns from analysis (e.g. `--exclude-path /health --exclude-path /metrics`). Supports prefix matching and exact paths.
-- [x] **`--since` days support** — `--since 3d` as a shorthand for `--since 72h`. Planck converts `Nd` → `N*24h` before passing to Docker.
-- [x] **`--filter-status` flag** — analyze only specific status codes (`2xx`, `4xx`, `5xx`, or exact like `200`, `404`)
-- [x] **`--until` flag** — exclude entries after a given time. Accepts a duration (`1h`, `3d`) or RFC3339 timestamp. Works for both Docker and file sources.
-- [x] **`--since` / `--until` for file-based logs** — timestamp range filtering applied at the parser level for log files
+- [x] **Prefixed JSON hint** — actionable hint when no entries are found due to log prefixes
+- [x] **Spring Boot `@timestamp` fix** — corrected preset for `logstash-logback-encoder`
 
-### V1.3 (planned)
-- [ ] **Streaming accumulator engine** — eliminate the current memory bottleneck.
-  Currently Planck buffers all log entries into memory before computing metrics.
-  V1.3 will replace this with a per-endpoint accumulator that processes one entry at a time:
-  - All counters (request count, error count, traffic by hour) become O(1) per entry.
-  - Latency storage is **capped per endpoint** (default: 10,000 samples) — enough for statistically accurate P95 computation on any real-world service, while bounding memory to a fixed ~4 MB regardless of log file size.
-  - The result: Planck will handle arbitrarily large log files on a 1 GB t2.micro without breaking a sweat.
-- [ ] `--latency-samples N` — configure the per-endpoint latency cap (default: 10,000)
+### v0.1.3 ✅ released
+- [x] **`--exclude-path` flag** — exclude URL patterns from analysis (repeatable, prefix matching)
+- [x] **`--filter-status` flag** — filter by status class (`2xx`, `4xx`, `5xx`) or exact code
+- [x] **`--since` days support** — `--since 3d` as shorthand for `--since 72h`
+- [x] **`--until` flag** — upper time bound for both Docker and file-based sources
+- [x] **`--since` / `--until` for file-based logs** — timestamp range filtering at the parser level
+- [x] **Docker stderr capture fix** — critical bug fix where all container log lines were silently dropped
+
+### v0.1.4 (planned)
+- [ ] `--latency-samples N` — configure the per-endpoint latency sample cap
+- [ ] **Streaming accumulator engine** — process one log entry at a time without buffering all entries into memory. Enables Planck to handle arbitrarily large log files on a 1 GB t2.micro.
 
 ### V2.0 (future)
 - [ ] Live log streaming (`planck tail`)
@@ -396,6 +396,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 - [ ] Docker Compose support
 
 Have an idea? [Open a feature request](https://github.com/mihirsn/planck/issues/new?template=feature_request.md).
+
 
 ---
 
