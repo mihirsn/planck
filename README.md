@@ -116,7 +116,7 @@ planck analyze --docker my-api --since 2h
 tail -n 10000 /var/log/app.log | planck analyze /dev/stdin
 ```
 
-**Planned fix (V1.3):** A streaming accumulator engine that processes one log entry at a time without building an in-memory slice. See [Roadmap](#roadmap) for details.
+**Planned fix (V1.4):** A streaming accumulator engine that processes one log entry at a time without building an in-memory slice. See [Roadmap](#roadmap) for details.
 
 ---
 
