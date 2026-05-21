@@ -41,6 +41,7 @@ type analyzeFlags struct {
 	scanJSON     bool
 	excludePaths []string
 	filterStatus string
+	filterMethod string
 	until        string
 }
 
@@ -86,13 +87,28 @@ Examples:
   planck analyze app.log --filter-status 5xx
   planck analyze --docker my-api --preset fastapi --filter-status 4xx
 
-  # Exclude noisy endpoints
+  # Filter by HTTP method (case-insensitive)
+  planck analyze app.log --filter-method POST
+  planck analyze --docker my-api --filter-method get
+
+  # Combine multiple filters (AND logic)
+  planck analyze app.log --filter-status 5xx --filter-method POST --since 1h
+  planck analyze --docker my-api --exclude-path /health --exclude-path /metrics --filter-method GET --filter-status 200 --since 1d
+
+  # Handle logs with text prefixes (e.g. Python "INFO:logger:{...}")
+  planck analyze app.log --scan-json
+
+  # Exclude noisy endpoints (repeatable flag)
   planck analyze --docker my-api --preset fastapi --exclude-path /health --exclude-path /metrics
 
-  # Time range for file-based logs
+  # Time range filtering
   planck analyze app.log --since 2h --until 2026-05-10T18:00:00Z
+  planck analyze --docker my-api --since 3d
 
-  # JSON output
+  # Limit terminal output (top N endpoints, slow N endpoints)
+  planck analyze app.log --top 10 --slow 3
+
+  # Machine-readable JSON output
   planck analyze app.log --format json | jq '.top_endpoints'`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		dockerFlag := cmd.Flags().Lookup("docker").Value.String()
@@ -134,6 +150,8 @@ func init() {
 		"Exclude entries whose path starts with this prefix (repeatable: --exclude-path /health --exclude-path /metrics)")
 	analyzeCmd.Flags().StringVar(&flags.filterStatus, "filter-status", "",
 		"Only include entries matching this status pattern: 2xx, 3xx, 4xx, 5xx, or an exact code (e.g. 200, 404)")
+	analyzeCmd.Flags().StringVar(&flags.filterMethod, "filter-method", "",
+		"Only include entries matching this HTTP method (e.g. GET, POST, PUT)")
 	analyzeCmd.Flags().StringVar(&flags.until, "until", "",
 		"Exclude entries after this time. Accepts a duration (e.g. 1h, 30m, 3d) or RFC3339 timestamp")
 
@@ -185,7 +203,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	p := parser.New(fieldMap).
 		SetScanJSON(flags.scanJSON).
 		SetExcludePaths(flags.excludePaths).
-		SetStatusFilter(flags.filterStatus)
+		SetStatusFilter(flags.filterStatus).
+		SetMethodFilter(flags.filterMethod)
 
 	// Apply time range filtering for file-based sources.
 	// (Docker sources already pre-filter via --since passed to `docker logs`;

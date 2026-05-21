@@ -183,11 +183,12 @@ planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
 planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
 ```
 
-### Filter by status code
+### Filter by HTTP method or status code
 
 ```bash
-planck analyze app.log --filter-status 5xx   # Only server errors
-planck analyze app.log --filter-status 404   # Only exact status code
+planck analyze app.log --filter-status 5xx                 # Only server errors
+planck analyze app.log --filter-method POST                # Only POST requests
+planck analyze app.log --filter-status 5xx --filter-method POST  # Combine filters
 ```
 
 ### Machine-readable JSON output
@@ -408,6 +409,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 - [x] **Docker stderr capture fix** — critical bug fix where all container log lines were silently dropped
 
 ### v0.1.4 (planned)
+- [x] **Requests Per Second (RPS)** — automatically display RPS in the analysis header
+- [x] **`--filter-method` flag** — filter by HTTP method (`GET`, `POST`, etc.)
 - [ ] `--latency-samples N` — configure the per-endpoint latency sample cap
 - [ ] **Streaming accumulator engine** — process one log entry at a time without buffering all entries into memory. Enables Planck to handle arbitrarily large log files on a 1 GB t2.micro.
 

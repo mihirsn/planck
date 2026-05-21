@@ -44,6 +44,7 @@ type Parser struct {
 	scanJSON     bool
 	excludePaths []string
 	statusFilter string    // e.g. "5xx", "4xx", "200" — empty means no filter
+	methodFilter string    // e.g. "POST", "GET" — empty means no filter
 	sinceTime    time.Time // zero means no lower bound
 	untilTime    time.Time // zero means no upper bound
 }
@@ -87,6 +88,15 @@ func (p *Parser) SetExcludePaths(paths []string) *Parser {
 // Returns the Parser for method chaining.
 func (p *Parser) SetStatusFilter(pattern string) *Parser {
 	p.statusFilter = strings.ToLower(strings.TrimSpace(pattern))
+	return p
+}
+
+// SetMethodFilter restricts analysis to entries matching the given HTTP method.
+// Matching is case-insensitive (e.g. "post" matches "POST").
+// An empty string disables filtering (all methods are included).
+// Returns the Parser for method chaining.
+func (p *Parser) SetMethodFilter(method string) *Parser {
+	p.methodFilter = strings.ToUpper(strings.TrimSpace(method))
 	return p
 }
 
@@ -144,6 +154,10 @@ func (p *Parser) isExcluded(path string) bool {
 func (p *Parser) isFiltered(entry models.LogEntry) bool {
 	// Status filter.
 	if p.statusFilter != "" && !matchesStatusFilter(entry.Status, p.statusFilter) {
+		return true
+	}
+	// Method filter.
+	if p.methodFilter != "" && !strings.EqualFold(entry.Method, p.methodFilter) {
 		return true
 	}
 	// Time range filter — only applied when the entry has a parseable timestamp.

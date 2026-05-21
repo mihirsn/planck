@@ -1,6 +1,7 @@
 package metrics_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -354,5 +355,64 @@ func TestCalculate_SlowN_LargerThanSlowEndpoints(t *testing.T) {
 
 	if len(report.SlowEndpoints) != 2 {
 		t.Errorf("expected all 2 slow endpoints when SlowN > available, got %d", len(report.SlowEndpoints))
+	}
+}
+
+func TestCalculate_AvgRPS(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		entries []models.LogEntry
+		wantRPS float64
+	}{
+		{
+			name: "10 seconds duration with 50 requests",
+			entries: []models.LogEntry{
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 0, 0, time.UTC)},
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 10, 0, time.UTC)},
+			}, // len(entries)=2, duration=10 => 0.2
+			wantRPS: 0.2,
+		},
+		{
+			name: "less than 1 second duration",
+			entries: []models.LogEntry{
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 0, 0, time.UTC)},
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 0, 500000000, time.UTC)}, // 500ms
+			},
+			wantRPS: 0, // Should be 0 for <1s
+		},
+		{
+			name: "exactly 1 second duration",
+			entries: []models.LogEntry{
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 0, 0, time.UTC)},
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 1, 0, time.UTC)},
+			},
+			wantRPS: 2.0, // len=2, duration=1s => 2.0
+		},
+		{
+			name:    "zero entries",
+			entries: []models.LogEntry{},
+			wantRPS: 0,
+		},
+		{
+			name: "unordered timestamps",
+			entries: []models.LogEntry{
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 10, 0, time.UTC)}, // Newest
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 5, 0, time.UTC)},
+				{Timestamp: time.Date(2026, 5, 8, 14, 0, 0, 0, time.UTC)}, // Oldest
+			},
+			wantRPS: 0.3, // len=3, duration=10s => 0.3
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			report := metrics.Calculate(tt.entries, metrics.Options{})
+			if math.Abs(report.AvgRPS-tt.wantRPS) > 0.0001 {
+				t.Errorf("AvgRPS = %v, want %v", report.AvgRPS, tt.wantRPS)
+			}
+		})
 	}
 }

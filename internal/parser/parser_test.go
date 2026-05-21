@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -674,6 +675,73 @@ func TestParseAll_TimeRange_ZeroTimesNoEffect(t *testing.T) {
 
 	if len(result.Entries) != 2 {
 		t.Errorf("expected 2 entries with zero time range, got %d", len(result.Entries))
+	}
+	if result.Filtered != 0 {
+		t.Errorf("expected Filtered=0, got %d", result.Filtered)
+	}
+}
+
+// --- filter-method tests ---
+
+func TestParseAll_FilterMethod_ExactMatch(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"POST","path":"/b","status":200,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","method":"PUT","path":"/c","status":200,"latency_ms":30}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("POST")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Method != "POST" {
+		t.Errorf("expected POST, got %s", result.Entries[0].Method)
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterMethod_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"post","path":"/b","status":200,"latency_ms":20}`,
+	}
+
+	// Filter with lowercase "post"
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("post")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	if !strings.EqualFold(result.Entries[0].Method, "POST") {
+		t.Errorf("expected POST, got %s", result.Entries[0].Method)
+	}
+	if result.Filtered != 1 {
+		t.Errorf("expected Filtered=1, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterMethod_EmptyFilter_NoEffect(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"POST","path":"/b","status":200,"latency_ms":20}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 entries with empty method filter, got %d", len(result.Entries))
 	}
 	if result.Filtered != 0 {
 		t.Errorf("expected Filtered=0, got %d", result.Filtered)
