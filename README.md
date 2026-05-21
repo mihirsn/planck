@@ -128,9 +128,7 @@ Download the latest binary for your platform from [GitHub Releases](https://gith
 
 ```bash
 # macOS / Linux
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -sSL "https://github.com/mihirsn/planck/releases/latest/download/planck_${OS}_${ARCH}.tar.gz" | tar -xz
+curl -sSL "https://github.com/mihirsn/planck/releases/latest/download/planck_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar -xz
 sudo mv planck /usr/local/bin/
 ```
 
