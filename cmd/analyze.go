@@ -79,8 +79,8 @@ Examples:
   planck analyze app.log --preset fastapi --field-latency process_time_ms
 
   # Docker with options
-  planck analyze --docker invoice-api --tail 1000 --since 1h
-  planck analyze --docker invoice-api --since 3d --preset fastapi
+  planck analyze --docker my-api --tail 1000 --since 1h
+  planck analyze --docker my-api --since 3d --preset fastapi
 
   # Filter by status class or exact code
   planck analyze app.log --filter-status 5xx
@@ -212,6 +212,14 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 					"      Add --scan-json to strip the prefix and parse these lines.\n"+
 					"      Or configure your logger with propagate=False (Python) to emit bare JSON.\n",
 				result.PrefixedJSON,
+			)
+		} else if result.Malformed > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(),
+				"\nHint: %d line(s) were skipped because they could not be parsed as JSON.\n"+
+					"      If you are analyzing a Docker container, this often happens if Docker outputs\n"+
+					"      an error message (e.g., container not found, or missing sudo permissions).\n"+
+					"      Try running the command with sudo, or check the container name.\n",
+				result.Malformed,
 			)
 		}
 		return nil

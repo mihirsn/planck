@@ -48,7 +48,7 @@ Planck bridges that gap: give it a log file or a Docker container name, and it t
 ```
 ⚛️  Planck Analysis
 ──────────────────────────────────────────────────
-Source:          Docker container "invoice-api"
+Source:          Docker container "my-api"
 Total requests:  12,430
 
 🔥 Top endpoints
@@ -154,19 +154,40 @@ planck analyze app.log
 ### Analyze Docker container logs
 
 ```bash
-planck analyze --docker invoice-api
+planck analyze --docker my-api
 ```
 
 ### Fetch only the last N lines from Docker
 
 ```bash
-planck analyze --docker invoice-api --tail 1000
+planck analyze --docker my-api --tail 1000
 ```
 
-### Fetch Docker logs from the last hour
+### Filter Docker logs by time
 
 ```bash
-planck analyze --docker invoice-api --since 1h
+planck analyze --docker my-api --since 1h
+planck analyze --docker my-api --since 3d  # Days are supported!
+```
+
+### Filter file logs by time
+
+```bash
+planck analyze app.log --since 12h
+planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
+```
+
+### Exclude noisy endpoints (e.g., health checks)
+
+```bash
+planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
+```
+
+### Filter by status code
+
+```bash
+planck analyze app.log --filter-status 5xx   # Only server errors
+planck analyze app.log --filter-status 404   # Only exact status code
 ```
 
 ### Machine-readable JSON output
