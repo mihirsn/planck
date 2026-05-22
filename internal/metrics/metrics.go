@@ -4,6 +4,7 @@ package metrics
 import (
 	"math"
 	"sort"
+	"time"
 
 	"github.com/mihirsn/planck/internal/models"
 )
@@ -73,6 +74,10 @@ type Report struct {
 	// TotalRequests is the total number of valid log entries analyzed.
 	TotalRequests int `json:"total_requests"`
 
+	// AvgRPS is the average requests per second across the analyzed time range.
+	// This is 0 if the time range is less than 1 second.
+	AvgRPS float64 `json:"avg_rps,omitempty"`
+
 	// MalformedLines is the count of lines that were skipped due to parsing errors.
 	MalformedLines int `json:"malformed_lines"`
 
@@ -109,6 +114,9 @@ func Calculate(entries []models.LogEntry, opts Options) Report {
 	accMap := make(map[string]*endpointAccumulator)
 	hourMap := make(map[int]int)
 
+	var hasTime bool
+	var minTime, maxTime time.Time
+
 	for i := range entries {
 		e := &entries[i]
 
@@ -129,13 +137,35 @@ func Calculate(entries []models.LogEntry, opts Options) Report {
 		// Accumulate per-hour traffic.
 		hour := e.Timestamp.UTC().Hour()
 		hourMap[hour]++
+
+		// Track min/max time for RPS calculation.
+		if !hasTime {
+			minTime, maxTime = e.Timestamp, e.Timestamp
+			hasTime = true
+		} else {
+			if e.Timestamp.Before(minTime) {
+				minTime = e.Timestamp
+			}
+			if e.Timestamp.After(maxTime) {
+				maxTime = e.Timestamp
+			}
+		}
 	}
 
 	stats := buildStats(accMap, len(entries))
 
+	var avgRPS float64
+	if hasTime {
+		durationSec := maxTime.Sub(minTime).Seconds()
+		if durationSec >= 1.0 && len(entries) > 0 {
+			avgRPS = float64(len(entries)) / durationSec
+		}
+	}
+
 	return Report{
 		SourceName:      opts.SourceName,
 		TotalRequests:   len(entries),
+		AvgRPS:          avgRPS,
 		MalformedLines:  opts.Malformed,
 		ExcludedEntries: opts.Excluded,
 		FilteredEntries: opts.Filtered,

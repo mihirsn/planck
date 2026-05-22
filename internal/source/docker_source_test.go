@@ -158,3 +158,45 @@ func TestDockerSource_Stream_MergesStdoutAndStderr(t *testing.T) {
 		t.Errorf("expected at least 2 lines (stdout + stderr), got %d: %v", len(lines), lines)
 	}
 }
+
+func TestNewDockerSource(t *testing.T) {
+	// Valid should return source (no validation on container name in constructor)
+	_, err := NewDockerSource("", 0, "")
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	// Valid should return source
+	src, err := NewDockerSource("my-container", 100, "1h")
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if src == nil {
+		t.Error("expected source, got nil")
+	}
+}
+
+func TestNormalizeSince(t *testing.T) {
+	// Empty should return empty
+	if got := normalizeSince(""); got != "" {
+		t.Errorf("expected empty string, got %s", got)
+	}
+
+	// Duration passes through unchanged
+	gotDur := normalizeSince("1h")
+	if gotDur != "1h" {
+		t.Errorf("expected 1h, got %s", gotDur)
+	}
+
+	// Days converts to hours
+	gotDays := normalizeSince("3d")
+	if gotDays != "72h" {
+		t.Errorf("expected 72h, got %s", gotDays)
+	}
+
+	// Already formatted should return as-is
+	rfcTime := "2026-05-10T15:00:00Z"
+	if got := normalizeSince(rfcTime); got != rfcTime {
+		t.Errorf("expected %s, got %s", rfcTime, got)
+	}
+}

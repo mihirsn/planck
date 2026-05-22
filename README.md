@@ -48,7 +48,7 @@ Planck bridges that gap: give it a log file or a Docker container name, and it t
 ```
 ⚛️  Planck Analysis
 ──────────────────────────────────────────────────
-Source:          Docker container "invoice-api"
+Source:          Docker container "my-api"
 Total requests:  12,430
 
 🔥 Top endpoints
@@ -154,19 +154,43 @@ planck analyze app.log
 ### Analyze Docker container logs
 
 ```bash
-planck analyze --docker invoice-api
+planck analyze --docker my-api
 ```
 
 ### Fetch only the last N lines from Docker
 
 ```bash
-planck analyze --docker invoice-api --tail 1000
+planck analyze --docker my-api --tail 1000
 ```
 
-### Fetch Docker logs from the last hour
+### Filter Docker logs by time
 
 ```bash
-planck analyze --docker invoice-api --since 1h
+planck analyze --docker my-api --since 1h
+planck analyze --docker my-api --since 3d  # Days are supported!
+```
+
+### Filter file logs by time
+
+```bash
+planck analyze app.log --since 12h
+planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
+```
+
+### Filter by HTTP method or status code (Allowlist)
+
+```bash
+planck analyze app.log --filter-status 5xx                 # Only server errors
+planck analyze app.log --filter-method POST                # Only POST requests
+planck analyze app.log --filter-status 5xx --filter-method POST  # Combine filters
+```
+
+### Exclude noisy traffic (Blocklist)
+
+```bash
+planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
+planck analyze app.log --exclude-status 404 --exclude-status 401
+planck analyze app.log --exclude-method OPTIONS --exclude-method HEAD
 ```
 
 ### Machine-readable JSON output
@@ -387,6 +411,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 - [x] **Docker stderr capture fix** — critical bug fix where all container log lines were silently dropped
 
 ### v0.1.4 (planned)
+- [x] **Requests Per Second (RPS)** — automatically display RPS in the analysis header
+- [x] **`--filter-method` flag** — filter by HTTP method (`GET`, `POST`, etc.)
 - [ ] `--latency-samples N` — configure the per-endpoint latency sample cap
 - [ ] **Streaming accumulator engine** — process one log entry at a time without buffering all entries into memory. Enables Planck to handle arbitrarily large log files on a 1 GB t2.micro.
 

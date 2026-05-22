@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -677,5 +678,149 @@ func TestParseAll_TimeRange_ZeroTimesNoEffect(t *testing.T) {
 	}
 	if result.Filtered != 0 {
 		t.Errorf("expected Filtered=0, got %d", result.Filtered)
+	}
+}
+
+// --- filter-method tests ---
+
+func TestParseAll_FilterMethod_ExactMatch(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"POST","path":"/b","status":200,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","method":"PUT","path":"/c","status":200,"latency_ms":30}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("POST")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Method != "POST" {
+		t.Errorf("expected POST, got %s", result.Entries[0].Method)
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterMethod_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"post","path":"/b","status":200,"latency_ms":20}`,
+	}
+
+	// Filter with lowercase "post"
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("post")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	if !strings.EqualFold(result.Entries[0].Method, "POST") {
+		t.Errorf("expected POST, got %s", result.Entries[0].Method)
+	}
+	if result.Filtered != 1 {
+		t.Errorf("expected Filtered=1, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_FilterMethod_EmptyFilter_NoEffect(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"POST","path":"/b","status":200,"latency_ms":20}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetMethodFilter("")
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Errorf("expected 2 entries with empty method filter, got %d", len(result.Entries))
+	}
+	if result.Filtered != 0 {
+		t.Errorf("expected Filtered=0, got %d", result.Filtered)
+	}
+}
+
+// --- exclude blocklist tests ---
+
+func TestParseAll_ExcludeStatuses(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"GET","path":"/b","status":401,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","method":"GET","path":"/c","status":404,"latency_ms":30}`,
+		`{"timestamp":"2026-05-08T14:00:04Z","method":"GET","path":"/d","status":500,"latency_ms":40}`,
+	}
+
+	// Exclude 401 exactly, and all 5xx
+	p := parser.New(models.DefaultFieldMap()).SetExcludeStatuses([]string{"401", "5xx"})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Status != 200 || result.Entries[1].Status != 404 {
+		t.Errorf("expected 200 and 404 to remain, got %d and %d", result.Entries[0].Status, result.Entries[1].Status)
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_ExcludeMethods(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":200,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"OPTIONS","path":"/b","status":200,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","method":"POST","path":"/c","status":200,"latency_ms":30}`,
+	}
+
+	p := parser.New(models.DefaultFieldMap()).SetExcludeMethods([]string{"options", "head"})
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Method != "GET" || result.Entries[1].Method != "POST" {
+		t.Errorf("expected GET and POST, got %s and %s", result.Entries[0].Method, result.Entries[1].Method)
+	}
+	if result.Filtered != 1 {
+		t.Errorf("expected Filtered=1, got %d", result.Filtered)
+	}
+}
+
+func TestParseAll_MixedAllowlistAndBlocklist(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/a","status":500,"latency_ms":10}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"GET","path":"/b","status":502,"latency_ms":20}`,
+		`{"timestamp":"2026-05-08T14:00:03Z","method":"GET","path":"/c","status":404,"latency_ms":30}`,
+	}
+
+	// Allow only 5xx, but explicitly block 502
+	p := parser.New(models.DefaultFieldMap()).
+		SetStatusFilter("5xx").
+		SetExcludeStatuses([]string{"502"})
+
+	result := p.ParseAll(makeChannel(lines))
+
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
+	}
+	if result.Entries[0].Status != 500 {
+		t.Errorf("expected 500 to remain, got %d", result.Entries[0].Status)
+	}
+	if result.Filtered != 2 {
+		t.Errorf("expected Filtered=2, got %d", result.Filtered)
 	}
 }

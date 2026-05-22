@@ -38,10 +38,13 @@ type analyzeFlags struct {
 	fieldLatency   string
 
 	// Parsing behaviour.
-	scanJSON     bool
-	excludePaths []string
-	filterStatus string
-	until        string
+	scanJSON        bool
+	excludePaths    []string
+	excludeStatuses []string
+	excludeMethods  []string
+	filterStatus    string
+	filterMethod    string
+	until           string
 }
 
 var flags analyzeFlags
@@ -79,20 +82,39 @@ Examples:
   planck analyze app.log --preset fastapi --field-latency process_time_ms
 
   # Docker with options
-  planck analyze --docker invoice-api --tail 1000 --since 1h
-  planck analyze --docker invoice-api --since 3d --preset fastapi
+  planck analyze --docker my-api --tail 1000 --since 1h
+  planck analyze --docker my-api --since 3d --preset fastapi
 
   # Filter by status class or exact code
   planck analyze app.log --filter-status 5xx
   planck analyze --docker my-api --preset fastapi --filter-status 4xx
 
-  # Exclude noisy endpoints
+  # Filter by HTTP method (case-insensitive)
+  planck analyze app.log --filter-method POST
+  planck analyze --docker my-api --filter-method get
+
+  # Combine multiple filters (AND logic)
+  planck analyze app.log --filter-status 5xx --filter-method POST --since 1h
+  planck analyze --docker my-api --exclude-path /health --exclude-path /metrics --filter-method GET --filter-status 200 --since 1d
+
+  # Exclude specific statuses or methods (Blocklist)
+  planck analyze app.log --exclude-status 404 --exclude-status 401
+  planck analyze app.log --exclude-method OPTIONS --exclude-method HEAD
+
+  # Handle logs with text prefixes (e.g. Python "INFO:logger:{...}")
+  planck analyze app.log --scan-json
+
+  # Exclude noisy endpoints (repeatable flag)
   planck analyze --docker my-api --preset fastapi --exclude-path /health --exclude-path /metrics
 
-  # Time range for file-based logs
+  # Time range filtering
   planck analyze app.log --since 2h --until 2026-05-10T18:00:00Z
+  planck analyze --docker my-api --since 3d
 
-  # JSON output
+  # Limit terminal output (top N endpoints, slow N endpoints)
+  planck analyze app.log --top 10 --slow 3
+
+  # Machine-readable JSON output
   planck analyze app.log --format json | jq '.top_endpoints'`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		dockerFlag := cmd.Flags().Lookup("docker").Value.String()
@@ -132,8 +154,14 @@ func init() {
 		"Scan each line for the first '{' before parsing (useful for logs with text prefixes like 'INFO:logger:{...}')")
 	analyzeCmd.Flags().StringArrayVar(&flags.excludePaths, "exclude-path", nil,
 		"Exclude entries whose path starts with this prefix (repeatable: --exclude-path /health --exclude-path /metrics)")
+	analyzeCmd.Flags().StringArrayVar(&flags.excludeStatuses, "exclude-status", nil,
+		"Exclude entries matching this status pattern (repeatable: --exclude-status 404 --exclude-status 3xx)")
+	analyzeCmd.Flags().StringArrayVar(&flags.excludeMethods, "exclude-method", nil,
+		"Exclude entries matching this HTTP method (repeatable: --exclude-method OPTIONS --exclude-method HEAD)")
 	analyzeCmd.Flags().StringVar(&flags.filterStatus, "filter-status", "",
 		"Only include entries matching this status pattern: 2xx, 3xx, 4xx, 5xx, or an exact code (e.g. 200, 404)")
+	analyzeCmd.Flags().StringVar(&flags.filterMethod, "filter-method", "",
+		"Only include entries matching this HTTP method (e.g. GET, POST, PUT)")
 	analyzeCmd.Flags().StringVar(&flags.until, "until", "",
 		"Exclude entries after this time. Accepts a duration (e.g. 1h, 30m, 3d) or RFC3339 timestamp")
 
@@ -185,7 +213,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	p := parser.New(fieldMap).
 		SetScanJSON(flags.scanJSON).
 		SetExcludePaths(flags.excludePaths).
-		SetStatusFilter(flags.filterStatus)
+		SetExcludeStatuses(flags.excludeStatuses).
+		SetExcludeMethods(flags.excludeMethods).
+		SetStatusFilter(flags.filterStatus).
+		SetMethodFilter(flags.filterMethod)
 
 	// Apply time range filtering for file-based sources.
 	// (Docker sources already pre-filter via --since passed to `docker logs`;
@@ -205,7 +236,18 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	result := p.ParseAll(lineCh)
 
 	if len(result.Entries) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No valid log entries found.")
+		if result.Filtered > 0 || result.Excluded > 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "No log entries matched the applied filters.")
+			if result.Excluded > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "  ⊘ Excluded %d entries matching --exclude-path filters.\n", result.Excluded)
+			}
+			if result.Filtered > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "  ⊘ Filtered %d entries matching status/method/time filters.\n", result.Filtered)
+			}
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "No valid log entries found.")
+		}
+
 		if result.PrefixedJSON > 0 {
 			fmt.Fprintf(cmd.OutOrStdout(),
 				"\nHint: %d line(s) contained JSON prefixed with text (e.g. \"INFO:logger:{...}\").\n"+
@@ -213,6 +255,17 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 					"      Or configure your logger with propagate=False (Python) to emit bare JSON.\n",
 				result.PrefixedJSON,
 			)
+		} else if result.Malformed > 0 {
+			msg := fmt.Sprintf("\nHint: %d line(s) were skipped because they could not be parsed as valid log entries.\n"+
+				"      This usually happens for two reasons:\n"+
+				"      1. The log format doesn't match Planck's schema (e.g. missing 'status' field).\n"+
+				"         Make sure to use a preset (like --preset fastapi) or custom field mapping.\n", result.Malformed)
+			if flags.docker != "" {
+				msg += fmt.Sprintf("      2. Docker output an error for container %q (e.g. missing sudo, or container not found).\n", flags.docker)
+			} else {
+				msg += "      2. The log file contains non-JSON text lines mixed with the logs.\n"
+			}
+			fmt.Fprint(cmd.OutOrStdout(), msg)
 		}
 		return nil
 	}

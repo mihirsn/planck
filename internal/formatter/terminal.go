@@ -28,8 +28,11 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 	fmt.Fprintf(w, "%s%s%s\n", colorGray, strings.Repeat("─", 50), colorReset)
 
 	fmt.Fprintf(w, "Source:          %s\n", report.SourceName)
-	fmt.Fprintf(w, "Total requests:  %s%s%s\n", colorBold, formatInt(report.TotalRequests), colorReset)
-
+	if report.AvgRPS > 0 {
+		fmt.Fprintf(w, "Total requests:  %s%s%s (Avg: %.1f req/sec)\n", colorBold, formatInt(report.TotalRequests), colorReset, report.AvgRPS)
+	} else {
+		fmt.Fprintf(w, "Total requests:  %s%s%s\n", colorBold, formatInt(report.TotalRequests), colorReset)
+	}
 	if report.MalformedLines > 0 {
 		fmt.Fprintf(w, "%s⚠  Skipped %d malformed log entries.%s\n",
 			colorYellow, report.MalformedLines, colorReset)
