@@ -40,13 +40,15 @@ type ParseResult struct {
 // Malformed lines (invalid JSON, missing required fields) are counted
 // but do not halt processing.
 type Parser struct {
-	fields       models.FieldMap
-	scanJSON     bool
-	excludePaths []string
-	statusFilter string    // e.g. "5xx", "4xx", "200" — empty means no filter
-	methodFilter string    // e.g. "POST", "GET" — empty means no filter
-	sinceTime    time.Time // zero means no lower bound
-	untilTime    time.Time // zero means no upper bound
+	fields          models.FieldMap
+	scanJSON        bool
+	excludePaths    []string
+	statusFilter    string    // e.g. "5xx", "4xx", "200" — empty means no filter
+	methodFilter    string    // e.g. "POST", "GET" — empty means no filter
+	excludeStatuses []string  // e.g. ["404", "401", "2xx"]
+	excludeMethods  []string  // e.g. ["OPTIONS", "HEAD"]
+	sinceTime       time.Time // zero means no lower bound
+	untilTime       time.Time // zero means no upper bound
 }
 
 // New returns a Parser that maps log fields using the given FieldMap.
@@ -97,6 +99,34 @@ func (p *Parser) SetStatusFilter(pattern string) *Parser {
 // Returns the Parser for method chaining.
 func (p *Parser) SetMethodFilter(method string) *Parser {
 	p.methodFilter = strings.ToUpper(strings.TrimSpace(method))
+	return p
+}
+
+// SetExcludeStatuses sets a list of status patterns to exclude from analysis.
+// Supported patterns: "2xx", "3xx", "4xx", "5xx", or exact codes like "404".
+// Returns the Parser for method chaining.
+func (p *Parser) SetExcludeStatuses(statuses []string) *Parser {
+	var cleaned []string
+	for _, s := range statuses {
+		if trimmed := strings.TrimSpace(s); trimmed != "" {
+			cleaned = append(cleaned, strings.ToLower(trimmed))
+		}
+	}
+	p.excludeStatuses = cleaned
+	return p
+}
+
+// SetExcludeMethods sets a list of HTTP methods to exclude from analysis.
+// Matching is case-insensitive.
+// Returns the Parser for method chaining.
+func (p *Parser) SetExcludeMethods(methods []string) *Parser {
+	var cleaned []string
+	for _, m := range methods {
+		if trimmed := strings.TrimSpace(m); trimmed != "" {
+			cleaned = append(cleaned, strings.ToUpper(trimmed))
+		}
+	}
+	p.excludeMethods = cleaned
 	return p
 }
 
@@ -152,14 +182,28 @@ func (p *Parser) isExcluded(path string) bool {
 // isFiltered reports whether an entry should be dropped by the status filter
 // or by the time range (since/until). Returns true when the entry should be skipped.
 func (p *Parser) isFiltered(entry models.LogEntry) bool {
-	// Status filter.
+	// Status filter (allowlist).
 	if p.statusFilter != "" && !matchesStatusFilter(entry.Status, p.statusFilter) {
 		return true
 	}
-	// Method filter.
+	// Status exclude (blocklist).
+	for _, pattern := range p.excludeStatuses {
+		if matchesStatusFilter(entry.Status, pattern) {
+			return true
+		}
+	}
+
+	// Method filter (allowlist).
 	if p.methodFilter != "" && !strings.EqualFold(entry.Method, p.methodFilter) {
 		return true
 	}
+	// Method exclude (blocklist).
+	for _, method := range p.excludeMethods {
+		if strings.EqualFold(entry.Method, method) {
+			return true
+		}
+	}
+
 	// Time range filter — only applied when the entry has a parseable timestamp.
 	if !entry.Timestamp.IsZero() {
 		if !p.sinceTime.IsZero() && entry.Timestamp.Before(p.sinceTime) {

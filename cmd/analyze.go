@@ -38,11 +38,13 @@ type analyzeFlags struct {
 	fieldLatency   string
 
 	// Parsing behaviour.
-	scanJSON     bool
-	excludePaths []string
-	filterStatus string
-	filterMethod string
-	until        string
+	scanJSON        bool
+	excludePaths    []string
+	excludeStatuses []string
+	excludeMethods  []string
+	filterStatus    string
+	filterMethod    string
+	until           string
 }
 
 var flags analyzeFlags
@@ -94,6 +96,10 @@ Examples:
   # Combine multiple filters (AND logic)
   planck analyze app.log --filter-status 5xx --filter-method POST --since 1h
   planck analyze --docker my-api --exclude-path /health --exclude-path /metrics --filter-method GET --filter-status 200 --since 1d
+
+  # Exclude specific statuses or methods (Blocklist)
+  planck analyze app.log --exclude-status 404 --exclude-status 401
+  planck analyze app.log --exclude-method OPTIONS --exclude-method HEAD
 
   # Handle logs with text prefixes (e.g. Python "INFO:logger:{...}")
   planck analyze app.log --scan-json
@@ -148,6 +154,10 @@ func init() {
 		"Scan each line for the first '{' before parsing (useful for logs with text prefixes like 'INFO:logger:{...}')")
 	analyzeCmd.Flags().StringArrayVar(&flags.excludePaths, "exclude-path", nil,
 		"Exclude entries whose path starts with this prefix (repeatable: --exclude-path /health --exclude-path /metrics)")
+	analyzeCmd.Flags().StringArrayVar(&flags.excludeStatuses, "exclude-status", nil,
+		"Exclude entries matching this status pattern (repeatable: --exclude-status 404 --exclude-status 3xx)")
+	analyzeCmd.Flags().StringArrayVar(&flags.excludeMethods, "exclude-method", nil,
+		"Exclude entries matching this HTTP method (repeatable: --exclude-method OPTIONS --exclude-method HEAD)")
 	analyzeCmd.Flags().StringVar(&flags.filterStatus, "filter-status", "",
 		"Only include entries matching this status pattern: 2xx, 3xx, 4xx, 5xx, or an exact code (e.g. 200, 404)")
 	analyzeCmd.Flags().StringVar(&flags.filterMethod, "filter-method", "",
@@ -203,6 +213,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	p := parser.New(fieldMap).
 		SetScanJSON(flags.scanJSON).
 		SetExcludePaths(flags.excludePaths).
+		SetExcludeStatuses(flags.excludeStatuses).
+		SetExcludeMethods(flags.excludeMethods).
 		SetStatusFilter(flags.filterStatus).
 		SetMethodFilter(flags.filterMethod)
 

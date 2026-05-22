@@ -177,18 +177,20 @@ planck analyze app.log --since 12h
 planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
 ```
 
-### Exclude noisy endpoints (e.g., health checks)
-
-```bash
-planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
-```
-
-### Filter by HTTP method or status code
+### Filter by HTTP method or status code (Allowlist)
 
 ```bash
 planck analyze app.log --filter-status 5xx                 # Only server errors
 planck analyze app.log --filter-method POST                # Only POST requests
 planck analyze app.log --filter-status 5xx --filter-method POST  # Combine filters
+```
+
+### Exclude noisy traffic (Blocklist)
+
+```bash
+planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
+planck analyze app.log --exclude-status 404 --exclude-status 401
+planck analyze app.log --exclude-method OPTIONS --exclude-method HEAD
 ```
 
 ### Machine-readable JSON output
