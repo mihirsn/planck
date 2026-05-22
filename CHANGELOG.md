@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.4] - 2026-05-22
+
+### Added
+- **Requests Per Second (RPS)** — new calculation in the report header based purely on the filtered logs.
+- **`--filter-method` flag** — restrict analysis to logs matching a specific HTTP method (e.g. `GET`, `POST`).
+- **`--exclude-status` blocklist flag** — explicitly exclude entries by status code or pattern (repeatable: `--exclude-status 404 --exclude-status 3xx`).
+- **`--exclude-method` blocklist flag** — explicitly exclude entries by HTTP method (repeatable: `--exclude-method OPTIONS --exclude-method HEAD`).
+- **Contextual Hints** — clearer terminal output distinguishing when 0 logs match your filters versus when 0 logs could be properly JSON parsed.
+
+### Fixed
+- **Project Test Coverage** — dramatically increased core and CLI test coverage above 90%.
+
+---
+
 ## [0.1.3] - 2026-05-16
 
 ### Added
