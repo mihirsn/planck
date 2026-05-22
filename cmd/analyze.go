@@ -224,7 +224,18 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	result := p.ParseAll(lineCh)
 
 	if len(result.Entries) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No valid log entries found.")
+		if result.Filtered > 0 || result.Excluded > 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "No log entries matched the applied filters.")
+			if result.Excluded > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "  ⊘ Excluded %d entries matching --exclude-path filters.\n", result.Excluded)
+			}
+			if result.Filtered > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "  ⊘ Filtered %d entries matching status/method/time filters.\n", result.Filtered)
+			}
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "No valid log entries found.")
+		}
+
 		if result.PrefixedJSON > 0 {
 			fmt.Fprintf(cmd.OutOrStdout(),
 				"\nHint: %d line(s) contained JSON prefixed with text (e.g. \"INFO:logger:{...}\").\n"+
@@ -233,13 +244,16 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 				result.PrefixedJSON,
 			)
 		} else if result.Malformed > 0 {
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"\nHint: %d line(s) were skipped because they could not be parsed as JSON.\n"+
-					"      If you are analyzing a Docker container, this often happens if Docker outputs\n"+
-					"      an error message (e.g., container not found, or missing sudo permissions).\n"+
-					"      Try running the command with sudo, or check the container name.\n",
-				result.Malformed,
-			)
+			msg := fmt.Sprintf("\nHint: %d line(s) were skipped because they could not be parsed as valid log entries.\n"+
+				"      This usually happens for two reasons:\n"+
+				"      1. The log format doesn't match Planck's schema (e.g. missing 'status' field).\n"+
+				"         Make sure to use a preset (like --preset fastapi) or custom field mapping.\n", result.Malformed)
+			if flags.docker != "" {
+				msg += fmt.Sprintf("      2. Docker output an error for container %q (e.g. missing sudo, or container not found).\n", flags.docker)
+			} else {
+				msg += "      2. The log file contains non-JSON text lines mixed with the logs.\n"
+			}
+			fmt.Fprint(cmd.OutOrStdout(), msg)
 		}
 		return nil
 	}
