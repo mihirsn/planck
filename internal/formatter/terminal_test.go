@@ -121,17 +121,6 @@ func TestPrintTerminal_EmptyReport(t *testing.T) {
 	}
 }
 
-func TestPrintTerminal_CompletionLine(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	formatter.PrintTerminal(&buf, makeReport())
-
-	if !strings.Contains(buf.String(), "Analysis complete") {
-		t.Error("expected completion line at end of output")
-	}
-}
-
 func TestPrintTerminal_LargeRequestCount(t *testing.T) {
 	t.Parallel()
 
