@@ -119,7 +119,6 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%s%s%s\n", colorGray, strings.Repeat("─", 50), colorReset)
-	fmt.Fprintf(w, "%sAnalysis complete.%s\n\n", colorGreen, colorReset)
 }
 
 // progressBar returns a fixed-width ASCII bar proportional to pct (0–100).

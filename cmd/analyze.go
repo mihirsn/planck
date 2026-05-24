@@ -15,6 +15,7 @@ import (
 	"github.com/mihirsn/planck/internal/models"
 	"github.com/mihirsn/planck/internal/parser"
 	"github.com/mihirsn/planck/internal/source"
+	"github.com/mihirsn/planck/internal/ui"
 )
 
 // analyzeFlags holds all CLI flags for the analyze command.
@@ -233,7 +234,18 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return nil //nolint:nilerr
 	}
 	p.SetTimeRange(sinceTime, untilTime)
+
+	var s *ui.Spinner
+	if flags.format == "text" {
+		s = ui.NewSpinner("Planck is analyzing...")
+		s.Start()
+	}
+
 	result := p.ParseAll(lineCh)
+
+	if s != nil {
+		s.Stop()
+	}
 
 	if len(result.Entries) == 0 {
 		if result.Filtered > 0 || result.Excluded > 0 {
