@@ -1,0 +1,73 @@
+# Watch Mode Reference
+
+`planck watch` continuously monitors a Docker container's logs on a configurable interval, evaluates your alert thresholds, and sends real-time push notifications via [ntfy](https://ntfy.sh/) when something goes wrong.
+
+> **No background daemon. No database. No agent.** Just a long-running terminal process — run it in a tmux pane or as a Docker command.
+
+## Quick Start
+
+**1. Create a `planck.yml` in your working directory:**
+
+```yaml
+watch:
+  interval: 60s          # Poll every 60 seconds
+  alert_cooldown: 10m    # Don't repeat the same alert within 10 minutes
+  preset: fastapi        # Your log format preset
+
+alerts:
+  error_rate_pct: 10.0   # Alert if any endpoint exceeds 10% error rate
+  p95_latency_ms: 2000   # Alert if any endpoint's p95 latency exceeds 2s
+  rps: 200               # Alert if requests per second exceeds 200
+
+notify:
+  ntfy_topic: my-api-alerts        # Your ntfy topic name
+  ntfy_server: https://ntfy.sh     # Or your self-hosted ntfy URL
+  ntfy_token: ""                   # Optional: for protected topics
+```
+
+**2. Subscribe to your ntfy topic** on your phone or desktop at `ntfy.sh/my-api-alerts`.
+
+**3. Start watching:**
+
+```bash
+planck watch --docker my-api
+```
+
+## Config File Reference
+
+Planck searches for `planck.yml` in this order:
+1. Path passed via `--config`
+2. Current working directory (`./planck.yml`)
+3. Home directory (`~/.planck.yml`)
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `watch.interval` | duration | `60s` | How often to poll logs |
+| `watch.alert_cooldown` | duration | `10m` | Minimum time between repeat alerts for the same threshold |
+| `watch.preset` | string | — | Log format preset (same as `--preset` on `analyze`) |
+| `alerts.error_rate_pct` | float | — | Alert if any endpoint's error rate exceeds this % |
+| `alerts.p95_latency_ms` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
+| `alerts.rps` | float | — | Alert if requests per second exceeds this value |
+| `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
+| `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
+| `notify.ntfy_token` | string | — | Bearer token for protected topics |
+
+> All `alerts` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
+
+## Using a Custom Config Path
+
+```bash
+# Useful for managing multiple environments
+planck watch --docker my-api --config /etc/planck/planck-prod.yml
+```
+
+## Self-Hosted ntfy
+
+[ntfy](https://ntfy.sh/) can be self-hosted on your own server. Simply point `ntfy_server` at your instance:
+
+```yaml
+notify:
+  ntfy_topic: my-alerts
+  ntfy_server: https://ntfy.yourdomain.com
+  ntfy_token: your-access-token
+```
