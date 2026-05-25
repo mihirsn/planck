@@ -244,12 +244,12 @@ notify:
 **3. Start watching:**
 
 ```bash
-planck watch --docker enterprise-billing-backend-1
+planck watch --docker my-api
 ```
 
 **Output:**
 ```
-⚛️  Planck watch started — container: "enterprise-billing-backend-1", interval: 1m0s
+⚛️  Planck watch started — container: "my-api", interval: 1m0s
    Alerts: error_rate≥10% | p95≥2000ms | rps≥200
 
 [17:05:00] ✓ Analysed 35 requests (0.58 req/s)
