@@ -1,23 +1,74 @@
-# ⚛️ Planck
+<h1 align="center">⚛️ Planck</h1>
 
-**Meaningful insights from logs with near-zero operational overhead.**
+<p align="center">
+  <b>Observe behavior at the smallest scale.</b><br/>
+  Meaningful insights from logs with near-zero operational overhead.
+</p>
 
-[![Go Build](https://github.com/mihirsn/planck/actions/workflows/go.yml/badge.svg)](https://github.com/mihirsn/planck/actions/workflows/go.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mihirsn/planck)](https://goreportcard.com/report/github.com/mihirsn/planck)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <a href="https://github.com/mihirsn/planck/actions/workflows/ci.yml">
+    <img src="https://github.com/mihirsn/planck/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+  <a href="https://github.com/mihirsn/planck/releases/latest">
+    <img src="https://img.shields.io/github/v/release/mihirsn/planck" alt="Latest Release">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+  </a>
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go" alt="Go Version">
+  </a>
+  <img src="https://img.shields.io/badge/status-early%20alpha-orange" alt="Status: Early Alpha">
+</p>
+
+---
+
+> **⚠️ Early Alpha — v0.1.x**
+>
+> Planck is in active early development. The log format, CLI flags, and JSON output schema **may change between versions** without a deprecation period.
+>
+> **Platform testing**: Manually tested and verified on **macOS arm64** only. Unit tests pass on Linux (ubuntu-latest) via CI. Binaries for Linux and Windows are built via goreleaser but have not yet been manually verified. If you try Planck on Linux or Windows and run into issues, please [open a bug report](https://github.com/mihirsn/planck/issues/new?template=bug_report.md) — your feedback helps.
+>
+> Feedback, bug reports, and ideas are very welcome — this is the best time to shape the direction of the project.
+
+---
 
 > 📖 **[Read the full documentation in the `/docs` folder](docs/README.md)**
 
 ## The Hook
 
-Planck is a sharp, focused terminal tool for developers who want answers quickly. It runs completely locally without external dependencies. 
+Planck transforms raw application logs into actionable operational insights — **without requiring Prometheus, Grafana, databases, or agents**.
 
-Planck is intentionally **not**:
-- Another Prometheus
-- Another Grafana  
-- Another massive observability platform
+Built for developers running applications on Docker, VPS, and small cloud environments who rely primarily on logs. Most observability tools assume you already have a metrics pipeline. Small teams, self-hosted apps, and early-stage products often don't — they have **logs**.
 
-It's a single static binary that instantly parses JSON logs and gives you actionable metrics.
+Planck bridges that gap: give it a log file or a Docker container name, and it tells you what's actually happening.
+
+```text
+⚛️  Planck Analysis
+──────────────────────────────────────────────────
+Source:          Docker container "my-api"
+Total requests:  12,430
+
+🔥 Top endpoints
+  /invoice                       ████████░░░░░░░░░░░░  42.1%
+  /login                         ████░░░░░░░░░░░░░░░░  18.3%
+  /checkout                      ██░░░░░░░░░░░░░░░░░░  11.2%
+
+⏰ Traffic by hour (UTC)
+  14:00  ████████████████████  3,200
+  15:00  ██████████████████░░  2,900
+
+⚠️  Error rates
+  /checkout                      50.0%
+  /invoice                       28.6%
+
+🐢 Slow endpoints
+  /checkout                      avg: 1103ms  p95: 1980ms
+
+💡 Insights
+  ⚠ /checkout has a high error rate of 50.0%
+  ⚠ /checkout is slow (avg: 1103ms, p95: 1980ms)
+```
 
 ## Quick Install
 
