@@ -2,6 +2,7 @@
 package notify
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -30,7 +31,7 @@ func NewClient(server, topic, token string) *Client {
 func (c *Client) Send(title, message string) error {
 	url := fmt.Sprintf("%s/%s", c.server, c.topic)
 
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(message))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, strings.NewReader(message))
 	if err != nil {
 		return fmt.Errorf("failed to build ntfy request: %w", err)
 	}
