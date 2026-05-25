@@ -72,12 +72,9 @@ Total requests:  12,430
 
 ## Quick Install
 
-If you have Go installed:
+Download the latest pre-compiled binary for macOS, Linux, or Windows from the **[Releases Page](https://github.com/mihirsn/planck/releases/latest)**.
 
-```bash
-go install github.com/mihirsn/planck@latest
-```
-*(See the [Installation Guide](docs/getting-started/installation.md) for more options).*
+*(See the [Installation Guide](docs/getting-started/installation.md) for `go install` and source build options).*
 
 ## Quick Start
 
