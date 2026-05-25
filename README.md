@@ -72,7 +72,11 @@ Total requests:  12,430
 
 ## Quick Install
 
-Download the latest pre-compiled binary for macOS, Linux, or Windows from the **[Releases Page](https://github.com/mihirsn/planck/releases/latest)**.
+```bash
+# macOS / Linux
+curl -sSL "https://github.com/mihirsn/planck/releases/latest/download/planck_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar -xz
+sudo mv planck /usr/local/bin/
+```
 
 *(See the [Installation Guide](docs/getting-started/installation.md) for `go install` and source build options).*
 
