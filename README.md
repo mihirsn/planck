@@ -79,11 +79,11 @@ Analysis complete.
 
 ## Features
 
-| Feature | V1.1 |
+| Feature | Status |
 |---|---|
 | Analyze JSON log files | ✅ |
 | Analyze Docker container logs | ✅ |
-| Total requests | ✅ |
+| Total requests + RPS | ✅ |
 | Top endpoints by traffic | ✅ |
 | Traffic by hour | ✅ |
 | Error rates per endpoint | ✅ |
@@ -92,6 +92,9 @@ Analysis complete.
 | Graceful handling of malformed lines | ✅ |
 | JSON output (`--format json`) | ✅ |
 | Single binary, no dependencies | ✅ |
+| Continuous watch mode (`planck watch`) | ✅ |
+| Real-time alerting via ntfy | ✅ |
+| Configurable alert thresholds (`planck.yml`) | ✅ |
 
 ---
 
@@ -205,6 +208,96 @@ planck analyze app.log --format json | jq '.top_endpoints'
 ```bash
 planck analyze app.log --top 10     # show top 10 endpoints (default: 5)
 planck analyze app.log --slow 3     # show 3 slowest endpoints (default: 5)
+```
+
+---
+
+## Watch Mode
+
+`planck watch` continuously monitors a Docker container's logs on a configurable interval, evaluates your alert thresholds, and sends real-time push notifications via [ntfy](https://ntfy.sh/) when something goes wrong.
+
+> **No background daemon. No database. No agent.** Just a long-running terminal process — run it in a tmux pane or as a Docker command.
+
+### Quick Start
+
+**1. Create a `planck.yml` in your working directory:**
+
+```yaml
+watch:
+  interval: 60s          # Poll every 60 seconds
+  alert_cooldown: 10m    # Don't repeat the same alert within 10 minutes
+  preset: fastapi        # Your log format preset
+
+alerts:
+  error_rate_pct: 10.0   # Alert if any endpoint exceeds 10% error rate
+  p95_latency_ms: 2000   # Alert if any endpoint's p95 latency exceeds 2s
+  rps: 200               # Alert if requests per second exceeds 200
+
+notify:
+  ntfy_topic: my-api-alerts        # Your ntfy topic name
+  ntfy_server: https://ntfy.sh     # Or your self-hosted ntfy URL
+  ntfy_token: ""                   # Optional: for protected topics
+```
+
+**2. Subscribe to your ntfy topic** on your phone or desktop at `ntfy.sh/my-api-alerts`.
+
+**3. Start watching:**
+
+```bash
+planck watch --docker enterprise-billing-backend-1
+```
+
+**Output:**
+```
+⚛️  Planck watch started — container: "enterprise-billing-backend-1", interval: 1m0s
+   Alerts: error_rate≥10% | p95≥2000ms | rps≥200
+
+[17:05:00] ✓ Analysed 35 requests (0.58 req/s)
+[17:06:00] — quiet window
+[17:07:00] ✓ Analysed 41 requests (0.68 req/s)
+
+   🚨 Alert sent: /api/v1/orders/customer/filter has a high error rate: 52.3% (threshold: 10%)
+
+[17:08:00] ✓ Analysed 38 requests (0.63 req/s)
+```
+
+### Config File Reference
+
+Planck searches for `planck.yml` in this order:
+1. Path passed via `--config`
+2. Current working directory (`./planck.yml`)
+3. Home directory (`~/.planck.yml`)
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `watch.interval` | duration | `60s` | How often to poll logs |
+| `watch.alert_cooldown` | duration | `10m` | Minimum time between repeat alerts for the same threshold |
+| `watch.preset` | string | — | Log format preset (same as `--preset` on `analyze`) |
+| `alerts.error_rate_pct` | float | — | Alert if any endpoint's error rate exceeds this % |
+| `alerts.p95_latency_ms` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
+| `alerts.rps` | float | — | Alert if requests per second exceeds this value |
+| `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
+| `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
+| `notify.ntfy_token` | string | — | Bearer token for protected topics |
+
+> All `alerts` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
+
+### Using a Custom Config Path
+
+```bash
+# Useful for managing multiple environments
+planck watch --docker my-api --config /etc/planck/planck-prod.yml
+```
+
+### Self-Hosted ntfy
+
+[ntfy](https://ntfy.sh/) can be self-hosted on your own server. Simply point `ntfy_server` at your instance:
+
+```yaml
+notify:
+  ntfy_topic: my-alerts
+  ntfy_server: https://ntfy.yourdomain.com
+  ntfy_token: your-access-token
 ```
 
 ---
@@ -410,16 +503,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
 - [x] **`--since` / `--until` for file-based logs** — timestamp range filtering at the parser level
 - [x] **Docker stderr capture fix** — critical bug fix where all container log lines were silently dropped
 
-### v0.1.4 (planned)
+### v0.1.4 ✅ released
 - [x] **Requests Per Second (RPS)** — automatically display RPS in the analysis header
 - [x] **`--filter-method` flag** — filter by HTTP method (`GET`, `POST`, etc.)
-- [ ] `--latency-samples N` — configure the per-endpoint latency sample cap
-- [ ] **Streaming accumulator engine** — process one log entry at a time without buffering all entries into memory. Enables Planck to handle arbitrarily large log files on a 1 GB t2.micro.
+- [x] **`--exclude-status` flag** — blocklist entries by status code or class
+- [x] **`--exclude-method` flag** — blocklist entries by HTTP method
+- [x] **Animated terminal spinner** — sleek braille loading indicator while analyzing
+- [x] **Test coverage >90%** — comprehensive unit test suite across all packages
 
-### V2.0 (future)
-- [ ] Live log streaming (`planck tail`)
+### v0.2.0 (in progress)
+- [x] **`planck watch` command** — continuous monitoring loop for Docker containers
+- [x] **`planck.yml` config file** — declarative threshold and notification configuration
+- [x] **ntfy alerting** — real-time push notifications via [ntfy.sh](https://ntfy.sh/) or self-hosted ntfy
+- [x] **Alert cooldown** — configurable per-threshold cooldown to prevent notification spam
+- [ ] **Streaming accumulator engine** — process logs without buffering all entries into memory
+
+### v0.3.0 (future)
 - [ ] Multiple container aggregation
 - [ ] Docker Compose support
+- [ ] Live log streaming (`planck tail`)
 
 Have an idea? [Open a feature request](https://github.com/mihirsn/planck/issues/new?template=feature_request.md).
 

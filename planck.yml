@@ -1,0 +1,13 @@
+watch:
+  interval: 30s
+  alert_cooldown: 5m
+  preset: fastapi
+
+alerts:
+  error_rate_pct: 5.0
+  p95_latency_ms: 500
+  rps: 200
+
+notify:
+  ntfy_topic: planck-alerts
+  ntfy_server: https://ntfy.sh
