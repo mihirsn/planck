@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Observe behavior at the smallest scale.</b><br/>
-  Lightweight log analysis for developers who live in the terminal.
+  Meaningful insights from logs with near-zero operational overhead.
 </p>
 
 <p align="center">
@@ -33,19 +33,17 @@
 
 ---
 
+> 📖 **[Read the full documentation in the `/docs` folder](docs/README.md)**
+
+## The Hook
+
 Planck transforms raw application logs into actionable operational insights — **without requiring Prometheus, Grafana, databases, or agents**.
 
-Built for developers running applications on Docker, VPS, and small cloud environments who rely primarily on logs.
-
----
-
-## Why Planck?
-
-Most observability tools assume you already have a metrics pipeline. Small teams, self-hosted apps, and early-stage products often don't — they have **logs**.
+Built for developers running applications on Docker, VPS, and small cloud environments who rely primarily on logs. Most observability tools assume you already have a metrics pipeline. Small teams, self-hosted apps, and early-stage products often don't — they have **logs**.
 
 Planck bridges that gap: give it a log file or a Docker container name, and it tells you what's actually happening.
 
-```
+```text
 ⚛️  Planck Analysis
 ──────────────────────────────────────────────────
 Source:          Docker container "my-api"
@@ -70,64 +68,9 @@ Total requests:  12,430
 💡 Insights
   ⚠ /checkout has a high error rate of 50.0%
   ⚠ /checkout is slow (avg: 1103ms, p95: 1980ms)
-
-──────────────────────────────────────────────────
-Analysis complete.
 ```
 
----
-
-## Features
-
-| Feature | Status |
-|---|---|
-| Analyze JSON log files | ✅ |
-| Analyze Docker container logs | ✅ |
-| Total requests + RPS | ✅ |
-| Top endpoints by traffic | ✅ |
-| Traffic by hour | ✅ |
-| Error rates per endpoint | ✅ |
-| Avg + P95 latency per endpoint | ✅ |
-| Slowest endpoints | ✅ |
-| Graceful handling of malformed lines | ✅ |
-| JSON output (`--format json`) | ✅ |
-| Single binary, no dependencies | ✅ |
-| Continuous watch mode (`planck watch`) | ✅ |
-| Real-time alerting via ntfy | ✅ |
-| Configurable alert thresholds (`planck.yml`) | ✅ |
-
----
-
-## Known Limitations
-
-### Memory usage scales with log file size
-
-Planck currently loads all parsed log entries into memory before computing metrics. This works well for typical log volumes but can be a concern for very large log files on memory-constrained servers (e.g. a t2.micro with 1 GB RAM).
-
-**Rule of thumb**: Planck comfortably handles log files up to ~100k entries on any modern machine. Beyond that, use the workarounds below.
-
-**Workarounds (available now):**
-
-```bash
-# Docker: only fetch the last 5000 lines
-planck analyze --docker my-api --tail 5000
-
-# Docker: only fetch logs from the last 2 hours
-planck analyze --docker my-api --since 2h
-
-# File: use tail before analyzing
-tail -n 10000 /var/log/app.log | planck analyze /dev/stdin
-```
-
-**Planned fix (V1.4):** A streaming accumulator engine that processes one log entry at a time without building an in-memory slice. See [Roadmap](#roadmap) for details.
-
----
-
-## Installation
-
-### Download a release binary (recommended)
-
-Download the latest binary for your platform from [GitHub Releases](https://github.com/mihirsn/planck/releases/latest).
+## Quick Install
 
 ```bash
 # macOS / Linux
@@ -135,409 +78,38 @@ curl -sSL "https://github.com/mihirsn/planck/releases/latest/download/planck_$(u
 sudo mv planck /usr/local/bin/
 ```
 
-### Build from source
+*(See the [Installation Guide](docs/getting-started/installation.md) for `go install` and source build options).*
 
-```bash
-git clone https://github.com/mihirsn/planck.git
-cd planck
-make build
-sudo mv planck /usr/local/bin/
-```
+## Quick Start
 
----
+Planck has two primary modes of operation.
 
-## Usage
-
-### Analyze a log file
-
-```bash
-planck analyze app.log
-```
-
-### Analyze Docker container logs
+### 1. Analyze Mode (Ad-hoc insights)
+Parse a log file or a Docker container's current log stream and generate a summary report.
 
 ```bash
 planck analyze --docker my-api
 ```
 
-### Fetch only the last N lines from Docker
-
-```bash
-planck analyze --docker my-api --tail 1000
-```
-
-### Filter Docker logs by time
-
-```bash
-planck analyze --docker my-api --since 1h
-planck analyze --docker my-api --since 3d  # Days are supported!
-```
-
-### Filter file logs by time
-
-```bash
-planck analyze app.log --since 12h
-planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
-```
-
-### Filter by HTTP method or status code (Allowlist)
-
-```bash
-planck analyze app.log --filter-status 5xx                 # Only server errors
-planck analyze app.log --filter-method POST                # Only POST requests
-planck analyze app.log --filter-status 5xx --filter-method POST  # Combine filters
-```
-
-### Exclude noisy traffic (Blocklist)
-
-```bash
-planck analyze --docker my-api --exclude-path /health --exclude-path /metrics
-planck analyze app.log --exclude-status 404 --exclude-status 401
-planck analyze app.log --exclude-method OPTIONS --exclude-method HEAD
-```
-
-### Machine-readable JSON output
-
-```bash
-planck analyze app.log --format json
-planck analyze app.log --format json | jq '.top_endpoints'
-```
-
-### Control how many endpoints are shown
-
-```bash
-planck analyze app.log --top 10     # show top 10 endpoints (default: 5)
-planck analyze app.log --slow 3     # show 3 slowest endpoints (default: 5)
-```
-
----
-
-## Watch Mode
-
-`planck watch` continuously monitors a Docker container's logs on a configurable interval, evaluates your alert thresholds, and sends real-time push notifications via [ntfy](https://ntfy.sh/) when something goes wrong.
-
-> **No background daemon. No database. No agent.** Just a long-running terminal process — run it in a tmux pane or as a Docker command.
-
-### Quick Start
-
-**1. Create a `planck.yml` in your working directory:**
-
-```yaml
-watch:
-  interval: 60s          # Poll every 60 seconds
-  alert_cooldown: 10m    # Don't repeat the same alert within 10 minutes
-  preset: fastapi        # Your log format preset
-
-alerts:
-  error_rate_pct: 10.0   # Alert if any endpoint exceeds 10% error rate
-  p95_latency_ms: 2000   # Alert if any endpoint's p95 latency exceeds 2s
-  rps: 200               # Alert if requests per second exceeds 200
-
-notify:
-  ntfy_topic: my-api-alerts        # Your ntfy topic name
-  ntfy_server: https://ntfy.sh     # Or your self-hosted ntfy URL
-  ntfy_token: ""                   # Optional: for protected topics
-```
-
-**2. Subscribe to your ntfy topic** on your phone or desktop at `ntfy.sh/my-api-alerts`.
-
-**3. Start watching:**
+### 2. Watch Mode (Continuous monitoring)
+Continuously monitor a Docker container's logs and send real-time push notifications via [ntfy.sh](https://ntfy.sh) when things go wrong.
 
 ```bash
 planck watch --docker my-api
 ```
 
-**Output:**
-```
-⚛️  Planck watch started — container: "my-api", interval: 1m0s
-   Alerts: error_rate≥10% | p95≥2000ms | rps≥200
-
-[17:05:00] ✓ Analysed 35 requests (0.58 req/s)
-[17:06:00] — quiet window
-[17:07:00] ✓ Analysed 41 requests (0.68 req/s)
-
-   🚨 Alert sent: /api/v1/orders/customer/filter has a high error rate: 52.3% (threshold: 10%)
-
-[17:08:00] ✓ Analysed 38 requests (0.63 req/s)
-```
-
-### Config File Reference
-
-Planck searches for `planck.yml` in this order:
-1. Path passed via `--config`
-2. Current working directory (`./planck.yml`)
-3. Home directory (`~/.planck.yml`)
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `watch.interval` | duration | `60s` | How often to poll logs |
-| `watch.alert_cooldown` | duration | `10m` | Minimum time between repeat alerts for the same threshold |
-| `watch.preset` | string | — | Log format preset (same as `--preset` on `analyze`) |
-| `alerts.error_rate_pct` | float | — | Alert if any endpoint's error rate exceeds this % |
-| `alerts.p95_latency_ms` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
-| `alerts.rps` | float | — | Alert if requests per second exceeds this value |
-| `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
-| `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
-| `notify.ntfy_token` | string | — | Bearer token for protected topics |
-
-> All `alerts` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
-
-### Using a Custom Config Path
-
-```bash
-# Useful for managing multiple environments
-planck watch --docker my-api --config /etc/planck/planck-prod.yml
-```
-
-### Self-Hosted ntfy
-
-[ntfy](https://ntfy.sh/) can be self-hosted on your own server. Simply point `ntfy_server` at your instance:
-
-```yaml
-notify:
-  ntfy_topic: my-alerts
-  ntfy_server: https://ntfy.yourdomain.com
-  ntfy_token: your-access-token
-```
+*(See the [Watch Mode Docs](docs/configuration/watch-mode.md) for configuration details).*
 
 ---
 
-## Log Format
+## Documentation Directory
 
-Planck reads **one JSON object per line** ([JSON Lines](https://jsonlines.org/) format).
+Dive into the full documentation:
 
-> **Note on log format**: Planck currently requires a specific JSON schema (described below). Use `--preset` or `--field-*` flags to adapt Planck to your existing log format — see [Field mapping flags](#field-mapping-flags) for details.
-
-```json
-{"timestamp":"2026-05-08T14:05:00Z","method":"POST","path":"/invoice","status":200,"latency_ms":120}
-{"timestamp":"2026-05-08T14:05:02Z","method":"GET","path":"/login","status":401,"latency_ms":50}
-{"timestamp":"2026-05-08T14:05:04Z","method":"GET","path":"/checkout","status":500,"latency_ms":980}
-```
-
-### Required fields
-
-| Field | Type | Description |
-|---|---|---|
-| `timestamp` | RFC3339 string | When the request was handled |
-| `path` | string | Request path (e.g. `/invoice`) |
-| `status` | integer | HTTP status code |
-
-### Optional fields
-
-| Field | Type | Description |
-|---|---|---|
-| `method` | string | HTTP method (GET, POST, etc.) |
-| `latency_ms` | integer | Request duration in milliseconds |
-
-> **On malformed lines**: Lines that are not valid JSON or are missing required fields are **skipped gracefully**. Planck reports how many were skipped and continues processing the rest.
-
----
-
-## Getting the Most Out of Planck
-
-### Add latency to your logs
-
-Latency data (`latency_ms`) is optional — Planck works without it. But without it, the **Slow Endpoints** section will be empty and P95/avg latency won't be shown.
-
-Adding latency is a one-line change in most frameworks and gives you significantly more insight. Here's how to do it:
-
-#### Go — `chi` router
-
-```go
-r.Use(func(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        start := time.Now()
-        ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-        next.ServeHTTP(ww, r)
-        log.Printf(`{"timestamp":%q,"method":%q,"path":%q,"status":%d,"latency_ms":%d}`,
-            time.Now().UTC().Format(time.RFC3339),
-            r.Method, r.URL.Path,
-            ww.Status(),
-            time.Since(start).Milliseconds(),
-        )
-    })
-})
-```
-
-#### Python — FastAPI / Starlette
-
-```python
-import time, logging
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class PlanckLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        start = time.time()
-        response = await call_next(request)
-        latency_ms = int((time.time() - start) * 1000)
-        logging.info('{"timestamp":"%s","method":"%s","path":"%s","status":%d,"latency_ms":%d}',
-            __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
-            request.method, request.url.path,
-            response.status_code, latency_ms)
-        return response
-
-app.add_middleware(PlanckLoggingMiddleware)
-```
-
-#### Node.js — Express
-
-```js
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      path: req.path,
-      status: res.statusCode,
-      latency_ms: Date.now() - start,
-    }));
-  });
-  next();
-});
-```
-
-### What if I already have logs without latency?
-
-Planck still works. It will show you request counts, top endpoints, traffic by hour, and error rates — everything except the latency-based sections. Those sections simply won't appear in the output rather than showing misleading zeros.
-
----
-
-## Flags Reference
-
-### Source flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--docker` | — | Docker container name or ID |
-| `--tail` | 0 (all) | Number of log lines to fetch from Docker |
-| `--since` | — | Fetch logs since duration (e.g. `1h`, `30m`) |
-
-### Output flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--format` | `text` | Output format: `text` or `json` |
-| `--top` | 5 | Number of top endpoints to display |
-| `--slow` | 5 | Number of slowest endpoints to display |
-
-### Field mapping flags
-
-Use these flags to tell Planck which JSON keys to read from your logs.
-Individual `--field-*` flags always override the `--preset` value.
-
-| Flag | Default | Description |
-|---|---|---|
-| `--preset` | — | Load a built-in field mapping preset (see table below) |
-| `--field-timestamp` | `timestamp` | JSON key for the timestamp |
-| `--field-method` | `method` | JSON key for the HTTP method |
-| `--field-path` | `path` | JSON key for the request path |
-| `--field-status` | `status` | JSON key for the HTTP status code |
-| `--field-latency` | `latency_ms` | JSON key for the request latency |
-
-### Parsing behaviour flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--scan-json` | `false` | Scan each line for the first `{` before parsing. Useful when logs have a text prefix (e.g. Python's `INFO:logger:{...}` format). |
-
-### Built-in presets
-
-| Preset | Framework | `--field-path` | `--field-status` | `--field-latency` | Notes |
-|---|---|---|---|---|---|
-| `fastapi` | FastAPI / uvicorn | `path` | `status_code` | `duration` | latency auto-converted from float seconds |
-| `express` | Express.js + morgan | `url` | `statusCode` | `responseTime` | |
-| `gin` | Go Gin | `path` | `status` | `latency` | |
-| `echo` | Go Echo | `uri` | `status` | `latency` | |
-| `spring` | Spring Boot | `uri` | `status` | `duration` | uses `@timestamp` (logstash-logback-encoder) |
-
----
-
-## Error Handling
-
-| Scenario | Planck output |
-|---|---|
-| Docker CLI not installed | `Docker CLI not found. Please install Docker or use file input mode.` |
-| Container not found | `Container "xyz" not found.` |
-| File not found | `log file not found: "app.log"` |
-| Malformed log lines | `⚠  Skipped 14 malformed log entries.` |
-
----
-
-## Development
-
-```bash
-# Clone and build
-git clone https://github.com/mihirsn/planck.git
-cd planck
-make build
-
-# Run tests
-make test
-
-# Check coverage (must be ≥ 90% on internal packages)
-make coverage-check
-
-# Run with sample logs
-make run ARGS="analyze sample-logs/app.log"
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
-
----
-
-## Roadmap
-
-### v0.1.2 ✅ released
-- [x] **Field mapping** — `--preset` flag with built-in presets for FastAPI, Express, Gin, Echo, Spring Boot
-- [x] **Custom field flags** — `--field-*` flags to map any JSON schema to Planck's model
-- [x] **`--scan-json` flag** — strip text prefixes (e.g. Python's `INFO:logger:{...}`) before parsing
-- [x] **Prefixed JSON hint** — actionable hint when no entries are found due to log prefixes
-- [x] **Spring Boot `@timestamp` fix** — corrected preset for `logstash-logback-encoder`
-
-### v0.1.3 ✅ released
-- [x] **`--exclude-path` flag** — exclude URL patterns from analysis (repeatable, prefix matching)
-- [x] **`--filter-status` flag** — filter by status class (`2xx`, `4xx`, `5xx`) or exact code
-- [x] **`--since` days support** — `--since 3d` as shorthand for `--since 72h`
-- [x] **`--until` flag** — upper time bound for both Docker and file-based sources
-- [x] **`--since` / `--until` for file-based logs** — timestamp range filtering at the parser level
-- [x] **Docker stderr capture fix** — critical bug fix where all container log lines were silently dropped
-
-### v0.1.4 ✅ released
-- [x] **Requests Per Second (RPS)** — automatically display RPS in the analysis header
-- [x] **`--filter-method` flag** — filter by HTTP method (`GET`, `POST`, etc.)
-- [x] **`--exclude-status` flag** — blocklist entries by status code or class
-- [x] **`--exclude-method` flag** — blocklist entries by HTTP method
-- [x] **Animated terminal spinner** — sleek braille loading indicator while analyzing
-- [x] **Test coverage >90%** — comprehensive unit test suite across all packages
-
-### v0.2.0 (in progress)
-- [x] **`planck watch` command** — continuous monitoring loop for Docker containers
-- [x] **`planck.yml` config file** — declarative threshold and notification configuration
-- [x] **ntfy alerting** — real-time push notifications via [ntfy.sh](https://ntfy.sh/) or self-hosted ntfy
-- [x] **Alert cooldown** — configurable per-threshold cooldown to prevent notification spam
-- [ ] **Streaming accumulator engine** — process logs without buffering all entries into memory
-
-### v0.3.0 (future)
-- [ ] Multiple container aggregation
-- [ ] Docker Compose support
-- [ ] Live log streaming (`planck tail`)
-
-Have an idea? [Open a feature request](https://github.com/mihirsn/planck/issues/new?template=feature_request.md).
-
-
----
-
-## Philosophy
-
-> Meaningful insights from logs with near-zero operational overhead.
-
-Planck is intentionally **not**:
-- Another Prometheus
-- Another Grafana  
-- Another observability platform
-
-It's a sharp, focused tool for developers who want answers quickly.
+* **Getting Started:** [Installation](docs/getting-started/installation.md) | [Quickstart](docs/getting-started/quickstart.md)
+* **Configuration:** [Analyze Flags](docs/configuration/analyze-flags.md) | [Watch Mode](docs/configuration/watch-mode.md) | [Custom Fields](docs/configuration/custom-fields.md)
+* **Guides:** [Parsing Docker Logs](docs/guides/parsing-docker.md) | [Adding Latency](docs/guides/adding-latency.md)
+* **Reference:** [Architecture & Roadmap](docs/architecture.md)
 
 ---
 
