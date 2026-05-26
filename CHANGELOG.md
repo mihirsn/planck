@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-05-26
+
+### Added
+- **`planck watch` command** — continuous monitoring loop for Docker containers.
+- **`planck.yml` config file** — declarative threshold and notification configuration.
+- **ntfy alerting** — real-time push notifications via ntfy.sh or self-hosted ntfy.
+- **Alert cooldowns** — configurable per-threshold cooldown to prevent notification spam.
+- **Terminal UI improvements** — sleek braille loading spinner while analyzing.
+- **Documentation Restructure** — comprehensive CNCF-style `docs/` folder.
+
+---
+
 ## [0.1.4] - 2026-05-22
 
 ### Added
