@@ -23,6 +23,10 @@ Currently, Planck operates on a buffered-read architecture:
 
 The current architecture means that **memory usage scales linearly with the number of log lines**.
 
+> **Workaround (today):** Use `--since` and `--until` to analyze a bounded time window instead of the entire log history. For example, `--since 1h` restricts analysis to the last hour of traffic, keeping memory usage low and execution fast. This is the recommended approach for large containers until the streaming engine is implemented.
+>
+> See the [Analyze Flags reference](configuration/analyze-flags.md) for the full `--since` / `--until` usage.
+
 ### Why the Accumulator Engine is Needed
 If you analyze 10 million log lines, Planck will attempt to allocate 10 million structs in RAM. On a tiny VM (like an AWS `t2.micro` with 1GB RAM), this will cause Planck to crash with an Out Of Memory (OOM) error.
 
