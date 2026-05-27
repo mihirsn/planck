@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="logo.png" alt="Planck Logo" width="120">
-</p>
-
-<h1 align="center">⚛️ Planck</h1>
+<h1 align="center">> Planck</h1>
 
 <p align="center">
   <b>Observe behavior at the smallest scale.</b><br/>
