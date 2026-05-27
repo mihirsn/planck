@@ -29,3 +29,4 @@ coverage.html
 
 # goreleaser
 dist/
+logo.png
