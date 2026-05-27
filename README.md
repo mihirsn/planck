@@ -23,8 +23,6 @@
 
 ---
 
-> **⚠️ Early Alpha — v0.1.x**
->
 > Planck is in active early development. The log format, CLI flags, and JSON output schema **may change between versions** without a deprecation period.
 >
 > **Platform testing**: Manually tested and verified on **macOS arm64** only. Unit tests pass on Linux (ubuntu-latest) via CI. Binaries for Linux and Windows are built via goreleaser but have not yet been manually verified. If you try Planck on Linux or Windows and run into issues, please [open a bug report](https://github.com/mihirsn/planck/issues/new?template=bug_report.md) — your feedback helps.
