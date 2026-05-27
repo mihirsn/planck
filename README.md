@@ -1,4 +1,4 @@
-<h1 align="center">> Planck</h1>
+<h1 align="center">> planck</h1>
 
 <p align="center">
   <b>Observe behavior at the smallest scale.</b><br/>
