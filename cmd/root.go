@@ -19,7 +19,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "planck",
 	Short: "Observe behavior at the smallest scale.",
-	Long: `⚛️  Planck — Lightweight log analysis for developers.
+	Long: `> Planck — Lightweight log analysis for developers.
 
 Transforms raw application logs into actionable operational insights
 without requiring heavyweight observability infrastructure.

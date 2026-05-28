@@ -42,7 +42,7 @@ Built for developers running applications on Docker, VPS, and small cloud enviro
 Planck bridges that gap: give it a log file or a Docker container name, and it tells you what's actually happening.
 
 ```text
-⚛️  Planck Analysis
+> Planck Analysis
 ──────────────────────────────────────────────────
 Source:          Docker container "my-api"
 Total requests:  12,430

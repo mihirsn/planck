@@ -24,7 +24,7 @@ const (
 // PrintTerminal writes a human-friendly report to w using ANSI color codes.
 func PrintTerminal(w io.Writer, report metrics.Report) {
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s⚛️  Planck Analysis%s\n", colorBold, colorReset)
+	fmt.Fprintf(w, "%s> Planck Analysis%s\n", colorBold, colorReset)
 	fmt.Fprintf(w, "%s%s%s\n", colorGray, strings.Repeat("─", 50), colorReset)
 
 	fmt.Fprintf(w, "Source:          %s\n", report.SourceName)

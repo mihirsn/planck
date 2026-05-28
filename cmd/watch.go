@@ -23,7 +23,7 @@ var watchFlags struct {
 var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Continuously monitor a Docker container and alert on threshold breaches",
-	Long: `⚛️  Planck Watch — Continuous monitoring with real-time alerting.
+	Long: `> Planck Watch — Continuous monitoring with real-time alerting.
 
 Planck watch polls a Docker container's logs on a configurable interval,
 evaluates your alert thresholds, and sends notifications via ntfy when
