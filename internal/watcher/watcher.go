@@ -107,10 +107,11 @@ func (w *Watcher) poll() {
 	}
 
 	report := metrics.Calculate(result.Entries, metrics.Options{
-		TopN:       10,
-		SlowN:      10,
-		SourceName: w.container,
-		Malformed:  result.Malformed,
+		TopN:             10,
+		SlowN:            10,
+		SourceName:       w.container,
+		Malformed:        result.Malformed,
+		FixedIntervalSec: w.cfg.Watch.IntervalDuration.Seconds(),
 	})
 
 	fmt.Fprintf(w.out, "[%s] ✓ Analysed %d requests (%.2f req/s)\n",

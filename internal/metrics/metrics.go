@@ -29,6 +29,11 @@ type Options struct {
 
 	// Filtered is the number of entries filtered out by --filter-status or time range.
 	Filtered int
+
+	// FixedIntervalSec, when > 0, overrides the log timestamp span as the RPS
+	// denominator. Use this in watch mode so RPS reflects "requests per poll
+	// interval" rather than the (potentially much shorter) burst window.
+	FixedIntervalSec float64
 }
 
 // EndpointStat holds aggregated statistics for a single endpoint path.
@@ -155,9 +160,18 @@ func Calculate(entries []models.LogEntry, opts Options) Report {
 	stats := buildStats(accMap, len(entries))
 
 	var avgRPS float64
-	if hasTime {
-		durationSec := maxTime.Sub(minTime).Seconds()
-		if durationSec >= 1.0 && len(entries) > 0 {
+	if len(entries) > 0 {
+		var durationSec float64
+		if opts.FixedIntervalSec > 0 {
+			// Watch mode: use the configured poll interval as the denominator so
+			// RPS reflects "requests in the last N seconds" consistently,
+			// regardless of whether traffic arrived in a burst or spread out.
+			durationSec = opts.FixedIntervalSec
+		} else if hasTime {
+			// Analyze mode: use the actual timestamp span of the log entries.
+			durationSec = maxTime.Sub(minTime).Seconds()
+		}
+		if durationSec >= 1.0 {
 			avgRPS = float64(len(entries)) / durationSec
 		}
 	}
