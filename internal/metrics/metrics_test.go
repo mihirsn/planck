@@ -416,3 +416,66 @@ func TestCalculate_AvgRPS(t *testing.T) {
 		})
 	}
 }
+
+// TestCalculate_AvgRPS_FixedInterval verifies that when FixedIntervalSec is set
+// (watch mode), RPS is based on the fixed interval — not the timestamp span.
+// This ensures a burst of 8 requests in 4s over a 30s window gives 8/30 = 0.27,
+// not 8/4 = 2.0, which is the confusing behaviour without this fix.
+func TestCalculate_AvgRPS_FixedInterval(t *testing.T) {
+	t.Parallel()
+
+	// 8 requests all arrived in a 4-second burst within a 30s poll window.
+	base := time.Date(2026, 5, 8, 14, 0, 0, 0, time.UTC)
+	entries := []models.LogEntry{
+		{Timestamp: base},
+		{Timestamp: base.Add(1 * time.Second)},
+		{Timestamp: base.Add(2 * time.Second)},
+		{Timestamp: base.Add(2 * time.Second)},
+		{Timestamp: base.Add(3 * time.Second)},
+		{Timestamp: base.Add(3 * time.Second)},
+		{Timestamp: base.Add(4 * time.Second)},
+		{Timestamp: base.Add(4 * time.Second)},
+	}
+
+	t.Run("without FixedIntervalSec (analyze mode) uses timestamp span", func(t *testing.T) {
+		t.Parallel()
+		report := metrics.Calculate(entries, metrics.Options{})
+		// span = 4s, requests = 8 => 2.0 req/s
+		wantRPS := 8.0 / 4.0
+		if math.Abs(report.AvgRPS-wantRPS) > 0.0001 {
+			t.Errorf("AvgRPS = %.4f, want %.4f (timestamp span mode)", report.AvgRPS, wantRPS)
+		}
+	})
+
+	t.Run("with FixedIntervalSec=30 (watch mode) uses poll interval", func(t *testing.T) {
+		t.Parallel()
+		report := metrics.Calculate(entries, metrics.Options{FixedIntervalSec: 30})
+		// fixed interval = 30s, requests = 8 => 0.2667 req/s
+		wantRPS := 8.0 / 30.0
+		if math.Abs(report.AvgRPS-wantRPS) > 0.0001 {
+			t.Errorf("AvgRPS = %.4f, want %.4f (fixed interval mode)", report.AvgRPS, wantRPS)
+		}
+	})
+
+	t.Run("FixedIntervalSec overrides even when timestamp span is larger", func(t *testing.T) {
+		t.Parallel()
+		// Entries spread over 60s, but interval is fixed at 30s.
+		wideEntries := []models.LogEntry{
+			{Timestamp: base},
+			{Timestamp: base.Add(60 * time.Second)},
+		}
+		report := metrics.Calculate(wideEntries, metrics.Options{FixedIntervalSec: 30})
+		wantRPS := 2.0 / 30.0
+		if math.Abs(report.AvgRPS-wantRPS) > 0.0001 {
+			t.Errorf("AvgRPS = %.4f, want %.4f", report.AvgRPS, wantRPS)
+		}
+	})
+
+	t.Run("zero entries with FixedIntervalSec returns 0", func(t *testing.T) {
+		t.Parallel()
+		report := metrics.Calculate([]models.LogEntry{}, metrics.Options{FixedIntervalSec: 30})
+		if report.AvgRPS != 0 {
+			t.Errorf("AvgRPS = %v, want 0 for empty entries", report.AvgRPS)
+		}
+	})
+}
