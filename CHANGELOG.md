@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-05-28
+
+### Fixed
+- **Watch mode RPS calculation** — RPS in `planck watch` now uses the configured poll interval as the denominator instead of the actual log timestamp span. This gives a consistent, predictable number regardless of whether traffic arrives in a burst or spread out across the window.
+- **Branding consistency** — replaced the `⚛️` atom emoji with `>` across all terminal output, `--help` descriptions, and the README sample output to match the project title.
+
+### Docs
+- Removed logo from README, keeping the file locally.
+- CNCF-style `docs/` folder fully restructured and published.
+- Added `--since`/`--until` workaround note to `docs/architecture.md`.
+
+
+---
+
 ## [0.2.0] - 2026-05-26
 
 ### Added
