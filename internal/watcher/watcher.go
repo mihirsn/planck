@@ -53,7 +53,7 @@ func New(cfg *config.Config, container string, fieldMap models.FieldMap, out io.
 
 // Run starts the polling loop. It blocks until the context is cancelled via the stop channel.
 func (w *Watcher) Run(stop <-chan struct{}) {
-	fmt.Fprintf(w.out, "⚛️  Planck watch started — container: %q, interval: %s\n", w.container, w.cfg.Watch.IntervalDuration)
+	fmt.Fprintf(w.out, "> Planck watch started — container: %q, interval: %s\n", w.container, w.cfg.Watch.IntervalDuration)
 	if summary := formatAlerts(w.cfg.Alerts); summary != "" {
 		fmt.Fprintf(w.out, "   Alerts: %s\n", summary)
 	} else {
@@ -70,7 +70,7 @@ func (w *Watcher) Run(stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
-			fmt.Fprintln(w.out, "\n⚛️  Planck watch stopped.")
+			fmt.Fprintln(w.out, "\n> Planck watch stopped.")
 			return
 		case <-ticker.C:
 			w.poll()
