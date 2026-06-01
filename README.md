@@ -33,7 +33,7 @@
 
 > 📖 **[Read the full documentation in the `/docs` folder](docs/README.md)**
 
-## What is Planck ?
+## Overview
 
 Planck transforms raw application logs into actionable operational insights — **without requiring Prometheus, Grafana, databases, or agents**.
 
