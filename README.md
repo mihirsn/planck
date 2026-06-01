@@ -33,7 +33,7 @@
 
 > 📖 **[Read the full documentation in the `/docs` folder](docs/README.md)**
 
-## The Hook
+## What is Planck ?
 
 Planck transforms raw application logs into actionable operational insights — **without requiring Prometheus, Grafana, databases, or agents**.
 
