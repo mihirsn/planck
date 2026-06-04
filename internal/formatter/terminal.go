@@ -23,6 +23,23 @@ const (
 
 // PrintTerminal writes a human-friendly report to w using ANSI color codes.
 func PrintTerminal(w io.Writer, report metrics.Report) {
+	maxPathLen := 30
+	for _, ep := range report.TopEndpoints {
+		if len(ep.Path) > maxPathLen {
+			maxPathLen = len(ep.Path)
+		}
+	}
+	for _, ep := range report.ErrorEndpoints {
+		if len(ep.Path) > maxPathLen {
+			maxPathLen = len(ep.Path)
+		}
+	}
+	for _, ep := range report.SlowEndpoints {
+		if len(ep.Path) > maxPathLen {
+			maxPathLen = len(ep.Path)
+		}
+	}
+
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%s> Planck Analysis%s\n", colorBold, colorReset)
 	fmt.Fprintf(w, "%s%s%s\n", colorGray, strings.Repeat("─", 50), colorReset)
@@ -54,8 +71,8 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 		fmt.Fprintf(w, "%s🔥 Top endpoints%s\n", colorBold, colorReset)
 		for _, ep := range report.TopEndpoints {
 			bar := progressBar(ep.SharePct, 20)
-			fmt.Fprintf(w, "  %-30s %s%s%s  %.1f%%\n",
-				ep.Path, colorCyan, bar, colorReset, ep.SharePct)
+			fmt.Fprintf(w, "  %-*s %s%s%s  %.1f%%\n",
+				maxPathLen, ep.Path, colorCyan, bar, colorReset, ep.SharePct)
 		}
 	}
 
@@ -73,8 +90,9 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 
 		for _, h := range report.TrafficByHour {
 			bar := trafficBar(h.Count, maxCount, 20)
-			fmt.Fprintf(w, "  %02d:00  %s%s%s  %s\n",
-				h.Hour, colorCyan, bar, colorReset, formatInt(h.Count))
+			label := fmt.Sprintf("%02d:00", h.Hour)
+			fmt.Fprintf(w, "  %-*s %s%s%s  %s\n",
+				maxPathLen, label, colorCyan, bar, colorReset, formatInt(h.Count))
 		}
 	}
 
@@ -87,7 +105,7 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 			if ep.ErrorRate >= 10.0 {
 				color = colorRed
 			}
-			fmt.Fprintf(w, "  %-30s %s%.1f%%%s\n", ep.Path, color, ep.ErrorRate, colorReset)
+			fmt.Fprintf(w, "  %-*s %s%.1f%%%s\n", maxPathLen, ep.Path, color, ep.ErrorRate, colorReset)
 		}
 	}
 
@@ -96,8 +114,8 @@ func PrintTerminal(w io.Writer, report metrics.Report) {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "%s🐢 Slow endpoints%s\n", colorBold, colorReset)
 		for _, ep := range report.SlowEndpoints {
-			fmt.Fprintf(w, "  %-30s avg: %s%.0fms%s  p95: %.0fms\n",
-				ep.Path, colorYellow, ep.AvgLatencyMs, colorReset, ep.P95LatencyMs)
+			fmt.Fprintf(w, "  %-*s avg: %s%.0fms%s  p95: %.0fms\n",
+				maxPathLen, ep.Path, colorYellow, ep.AvgLatencyMs, colorReset, ep.P95LatencyMs)
 		}
 	}
 
