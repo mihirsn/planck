@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-06-04
+
+### Fixed
+- **Terminal UI Alignment** — fixed an issue where the progress bars in the "Traffic by hour" section were misaligned compared to the "Top endpoints" section. All bars now perfectly align vertically based on the longest endpoint path.
+
+### Docs
+- Minor README updates.
+
+
+---
+
 ## [0.2.1] - 2026-05-28
 
 ### Fixed
