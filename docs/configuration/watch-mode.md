@@ -71,3 +71,57 @@ notify:
   ntfy_server: https://ntfy.yourdomain.com
   ntfy_token: your-access-token
 ```
+
+## Running in Production
+
+Because `planck watch` is a standalone binary and not a background daemon, it will stop if your SSH session disconnects (due to Linux sending a `SIGHUP` signal). 
+
+To keep Planck running continuously in the background, choose one of these two options:
+
+### Option 1: The Quick Way (`tmux`)
+Use `tmux` to create a virtual terminal session that survives SSH disconnects. This is great if you still want to easily view the live terminal output.
+
+```bash
+# Start a new tmux session
+tmux
+
+# Run your watcher
+planck watch --docker my-api
+
+# To safely detach and leave it running in the background:
+# Press Ctrl+b, then press d
+
+# When you SSH back in later, reattach with:
+tmux attach
+```
+
+### Option 2: The Production Way (`systemd`)
+For a true "set and forget" deployment that automatically restarts if your server reboots, configure Planck as a `systemd` service.
+
+1. Create a service file: `sudo nano /etc/systemd/system/planck.service`
+2. Paste the following configuration (adjust the `ExecStart` path as needed):
+
+```ini
+[Unit]
+Description=Planck Watcher
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/planck watch --docker my-api
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. Enable and start the daemon:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable planck
+sudo systemctl start planck
+```
+
+You can view the background logs at any time using `sudo journalctl -u planck -f`.
