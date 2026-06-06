@@ -10,6 +10,7 @@
 
 ```yaml
 watch:
+  docker: my-api              # Docker container name or ID to watch
   interval: 60s          # Poll every 60 seconds
   alert_cooldown: 10m    # Don't repeat the same alert within 10 minutes
   preset: fastapi        # Your log format preset
@@ -30,6 +31,10 @@ notify:
 **3. Start watching:**
 
 ```bash
+# Container name is read from planck.yml
+planck watch
+
+# Or override the container name at runtime
 planck watch --docker my-api
 ```
 
@@ -42,6 +47,7 @@ Planck searches for `planck.yml` in this order:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `watch.docker` | string | — | Docker container name or ID to watch. Can be overridden via `--docker` flag |
 | `watch.interval` | duration | `60s` | How often to poll logs |
 | `watch.alert_cooldown` | duration | `10m` | Minimum time between repeat alerts for the same threshold |
 | `watch.preset` | string | — | Log format preset (same as `--preset` on `analyze`) |
@@ -103,14 +109,13 @@ For a true "set and forget" deployment that automatically restarts if your serve
 
 #### If you installed via `.deb` or `.rpm`
 
-The systemd service file is already installed on your machine. You just need to edit the container name and enable it:
+The systemd service file is already installed. The `ExecStart` is simply `planck watch` — no container name is hardcoded. Just make sure `watch.docker` is set in your `planck.yml`, then enable it:
 
 ```bash
-# Set the Docker container name you want to monitor
-sudo nano /etc/systemd/system/planck.service
-# Update the ExecStart line: ExecStart=/usr/local/bin/planck watch --docker your-container-name
+# Confirm your planck.yml has watch.docker set
+cat /etc/planck/planck.yml
 
-# Then enable and start it
+# Enable and start
 sudo systemctl daemon-reload
 sudo systemctl enable planck
 sudo systemctl start planck
@@ -121,7 +126,7 @@ sudo systemctl start planck
 You need to create the service file manually first:
 
 1. Create the file: `sudo nano /etc/systemd/system/planck.service`
-2. Paste the following (adjust `--docker` to your container name):
+2. Paste the following:
 
 ```ini
 [Unit]
@@ -131,7 +136,7 @@ Requires=docker.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/planck watch --docker my-api
+ExecStart=/usr/local/bin/planck watch
 Restart=on-failure
 RestartSec=5s
 User=root
@@ -152,4 +157,5 @@ sudo systemctl start planck
 ```
 
 You can view the background logs at any time using `sudo journalctl -u planck -f`.
+
 

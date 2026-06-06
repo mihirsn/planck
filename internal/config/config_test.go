@@ -267,3 +267,39 @@ func TestDiscover_CurrentDir(t *testing.T) {
 		t.Errorf("expected planck.yml, got %q", found)
 	}
 }
+
+func TestLoad_WatchDocker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("docker field is read from config", func(t *testing.T) {
+		t.Parallel()
+		path := writeConfig(t, `
+watch:
+  docker: my-api
+notify:
+  ntfy_topic: my-topic
+`)
+		cfg, err := config.Load(path)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if cfg.Watch.Docker != "my-api" {
+			t.Errorf("expected watch.docker=my-api, got %q", cfg.Watch.Docker)
+		}
+	})
+
+	t.Run("docker field is optional and defaults to empty string", func(t *testing.T) {
+		t.Parallel()
+		path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+`)
+		cfg, err := config.Load(path)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if cfg.Watch.Docker != "" {
+			t.Errorf("expected empty watch.docker, got %q", cfg.Watch.Docker)
+		}
+	})
+}

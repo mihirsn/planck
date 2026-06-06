@@ -37,6 +37,7 @@ All configuration lives in planck.yml. Planck searches for it in:
 Example planck.yml:
 
   watch:
+    docker: my-api
     interval: 60s
     alert_cooldown: 10m
     preset: fastapi
@@ -51,16 +52,16 @@ Example planck.yml:
     ntfy_server: https://ntfy.sh
 
 Usage:
-  planck watch --docker my-api
-  planck watch --docker my-api --config /etc/planck/planck.yml`,
+  planck watch                              # container name from planck.yml
+  planck watch --docker my-api             # override container via flag
+  planck watch --config /etc/planck/planck.yml`,
 
 	RunE: runWatch,
 }
 
 func init() {
-	watchCmd.Flags().StringVar(&watchFlags.docker, "docker", "", "Docker container name or ID to watch (required)")
+	watchCmd.Flags().StringVar(&watchFlags.docker, "docker", "", "Docker container name or ID to watch (overrides planck.yml)")
 	watchCmd.Flags().StringVar(&watchFlags.configPath, "config", "", "Path to planck.yml (default: auto-discover)")
-	_ = watchCmd.MarkFlagRequired("docker")
 	rootCmd.AddCommand(watchCmd)
 }
 
@@ -111,8 +112,21 @@ func runWatch(cmd *cobra.Command, _ []string) error {
 		close(stop)
 	}()
 
+	// --- Resolve Docker container name (flag takes priority over planck.yml) ---
+	container := watchFlags.docker
+	if container == "" {
+		container = cfg.Watch.Docker
+	}
+	if container == "" {
+		return fmt.Errorf(
+			"no Docker container specified.\n" +
+				"Set watch.docker in planck.yml or pass --docker <container>.\n" +
+				"See: https://github.com/mihirsn/planck/blob/main/docs/configuration/watch-mode.md",
+		)
+	}
+
 	// --- Run the watcher ---
-	w := watcher.New(cfg, watchFlags.docker, fieldMap, cmd.OutOrStdout())
+	w := watcher.New(cfg, container, fieldMap, cmd.OutOrStdout())
 	w.Run(stop)
 
 	return nil
