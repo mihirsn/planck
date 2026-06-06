@@ -93,6 +93,9 @@ planck watch --docker my-api
 
 # When you SSH back in later, reattach with:
 tmux attach
+
+# You will immediately see the live terminal output and all the
+# analysis history that Planck printed while you were away!
 ```
 
 ### Option 2: The Production Way (`systemd`)
