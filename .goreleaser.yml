@@ -39,6 +39,28 @@ checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
   algorithm: sha256
 
+nfpms:
+  - id: planck
+    package_name: planck
+    vendor: Mihir Naik
+    homepage: https://github.com/mihirsn/planck
+    maintainer: Mihir Naik
+    description: |-
+      Lightweight log analysis and real-time monitoring for Docker containers.
+      Transforms raw application logs into actionable insights with near-zero
+      operational overhead.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/local/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: packaging/systemd/planck.service
+        dst: /etc/systemd/system/planck.service
+        type: config
+
 changelog:
   sort: asc
   use: github
@@ -61,6 +83,18 @@ release:
     **macOS / Linux (curl)**
     ```bash
     curl -sSL "https://github.com/mihirsn/planck/releases/download/{{ .Tag }}/planck_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar -xz && sudo mv planck /usr/local/bin/
+    ```
+
+    **Ubuntu / Debian (.deb)**
+    ```bash
+    curl -OL https://github.com/mihirsn/planck/releases/download/{{ .Tag }}/planck_{{ .Version }}_linux_amd64.deb
+    sudo dpkg -i planck_{{ .Version }}_linux_amd64.deb
+    ```
+
+    **CentOS / Amazon Linux (.rpm)**
+    ```bash
+    curl -OL https://github.com/mihirsn/planck/releases/download/{{ .Tag }}/planck_{{ .Version }}_linux_amd64.rpm
+    sudo rpm -i planck_{{ .Version }}_linux_amd64.rpm
     ```
 
     **Direct download**: See the assets below for your platform.
