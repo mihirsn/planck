@@ -96,7 +96,7 @@ Continuously monitor a Docker container's logs and send real-time push notificat
 planck watch --docker my-api
 ```
 
-*(See the [Watch Mode Docs](docs/configuration/watch-mode.md) for configuration details).*
+*(See the [Watch Mode Docs](docs/configuration/watch-mode.md) for configuration and production deployment details).*
 
 ---
 
