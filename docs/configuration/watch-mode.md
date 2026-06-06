@@ -101,19 +101,43 @@ tmux attach
 ### Option 2: The Production Way (`systemd`)
 For a true "set and forget" deployment that automatically restarts if your server reboots, configure Planck as a `systemd` service.
 
-1. Create a service file: `sudo nano /etc/systemd/system/planck.service`
-2. Paste the following configuration (adjust the `ExecStart` path as needed):
+#### If you installed via `.deb` or `.rpm`
+
+The systemd service file is already installed on your machine. You just need to edit the container name and enable it:
+
+```bash
+# Set the Docker container name you want to monitor
+sudo nano /etc/systemd/system/planck.service
+# Update the ExecStart line: ExecStart=/usr/local/bin/planck watch --docker your-container-name
+
+# Then enable and start it
+sudo systemctl daemon-reload
+sudo systemctl enable planck
+sudo systemctl start planck
+```
+
+#### If you installed via `curl` / `tar.gz`
+
+You need to create the service file manually first:
+
+1. Create the file: `sudo nano /etc/systemd/system/planck.service`
+2. Paste the following (adjust `--docker` to your container name):
 
 ```ini
 [Unit]
 Description=Planck Watcher
 After=docker.service
+Requires=docker.service
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/planck watch --docker my-api
-Restart=always
+Restart=on-failure
+RestartSec=5s
 User=root
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planck
 
 [Install]
 WantedBy=multi-user.target
@@ -128,3 +152,4 @@ sudo systemctl start planck
 ```
 
 You can view the background logs at any time using `sudo journalctl -u planck -f`.
+
