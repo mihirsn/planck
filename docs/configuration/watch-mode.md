@@ -109,10 +109,10 @@ For a true "set and forget" deployment that automatically restarts if your serve
 
 #### If you installed via `.deb` or `.rpm`
 
-The systemd service file is already installed. The `ExecStart` is simply `planck watch` — no container name is hardcoded. Just make sure `watch.docker` is set in your `planck.yml`, then enable it:
+The systemd service file is already installed. The `ExecStart` is simply `planck watch` — no container name is hardcoded. Just make sure the `docker` field is set with your container name under `watch` in your `planck.yml`, then enable it:
 
 ```bash
-# Confirm your planck.yml has watch.docker set
+# Confirm your planck.yml has the docker container set
 cat /etc/planck/planck.yml
 
 # Enable and start
