@@ -27,7 +27,7 @@
 >
 > **Platform testing**: Manually tested and verified on **macOS arm64** only. Unit tests pass on Linux (ubuntu-latest) via CI. Binaries for Linux and Windows are built via goreleaser but have not yet been manually verified. If you try Planck on Linux or Windows and run into issues, please [open a bug report](https://github.com/mihirsn/planck/issues/new?template=bug_report.md) — your feedback helps.
 >
-> Feedback, bug reports, and ideas are very welcome — this is the best time to shape the direction of the project.
+> Feedback, bug reports, and ideas are very welcome.
 
 ---
 
@@ -37,7 +37,7 @@
 
 Planck transforms raw application logs into actionable operational insights — **without requiring Prometheus, Grafana, databases, or agents**.
 
-Built for developers running applications on Docker, VPS, and small cloud environments who rely primarily on logs. Most observability tools assume you already have a metrics pipeline. Small teams, self-hosted apps, and early-stage products often don't — they have **logs**.
+Planck is not another Prometheus or Grafana and does not intend to, rather its built for developers running applications on Docker, VPS, and small cloud environments who rely primarily on logs. Most observability tools assume you already have a metrics pipeline. Small teams, self-hosted apps, and early-stage products often don't.
 
 Planck bridges that gap: give it a log file or a Docker container name, and it tells you what's actually happening.
 
