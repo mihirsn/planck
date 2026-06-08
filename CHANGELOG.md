@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.3] - 2026-06-08
+
+### Added
+- **Linux Packages** — `.deb` (Ubuntu/Debian) and `.rpm` (CentOS/Amazon Linux) packages are now automatically generated with every release. These packages bundle a pre-configured `systemd` service file for effortless background daemon setups.
+- **Config-driven Watch Targets** — You can now specify the target Docker container directly in your `planck.yml` under `watch.docker`. The `--docker` CLI flag is now optional and acts as a runtime override. This allows for fully hardcode-free systemd service files.
+
+### Docs
+- Added a comprehensive "Running in Production" guide detailing how to keep `planck watch` running persistently using `tmux` or `systemd`.
+- Completely revamped the Installation Guide to cover all available distribution methods.
+
+
+---
+
 ## [0.2.2] - 2026-06-04
 
 ### Fixed
