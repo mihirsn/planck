@@ -42,6 +42,7 @@ checksum:
 nfpms:
   - id: planck
     package_name: planck
+    file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     vendor: Mihir Naik
     homepage: https://github.com/mihirsn/planck
     maintainer: Mihir Naik

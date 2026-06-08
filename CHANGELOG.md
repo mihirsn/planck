@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.5] - 2026-06-08
+
+### Fixed
+- **Package Filenames** — Configured Goreleaser to strip the version number from `.deb` and `.rpm` filenames (e.g. `planck_linux_amd64.deb`). This matches the binary `.tar.gz` format and ensures that the generic GitHub `releases/latest/download/...` URLs in the documentation will never break when new versions are released.
+
+---
+
 ## [0.2.4] - 2026-06-08
 
 ### Fixed
