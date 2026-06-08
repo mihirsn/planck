@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.4] - 2026-06-08
+
+### Fixed
+- **Systemd Config Resolution** — The systemd service file bundled in the `.deb` and `.rpm` packages now explicitly uses `--config /etc/planck/planck.yml`. This ensures Planck can locate your configuration correctly when running as a background daemon.
+- **Global Config Discovery** — Added `/etc/planck/planck.yml` to the default configuration discovery paths, so manual `planck watch` commands will automatically find it.
+
+---
+
 ## [0.2.3] - 2026-06-08
 
 ### Added

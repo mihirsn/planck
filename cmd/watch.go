@@ -33,6 +33,7 @@ All configuration lives in planck.yml. Planck searches for it in:
   1. The path passed to --config
   2. The current working directory (./planck.yml)
   3. Your home directory (~/.planck.yml)
+  4. Global config (/etc/planck/planck.yml)
 
 Example planck.yml:
 

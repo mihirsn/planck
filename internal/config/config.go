@@ -63,6 +63,7 @@ type NotifyConfig struct {
 var DefaultConfigPaths = []string{
 	"planck.yml",
 	"~/.planck.yml",
+	"/etc/planck/planck.yml",
 }
 
 // Discover returns the first planck.yml path that exists, searching DefaultConfigPaths.

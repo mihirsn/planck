@@ -6,7 +6,7 @@ Requires=docker.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/planck watch
+ExecStart=/usr/local/bin/planck watch --config /etc/planck/planck.yml
 Restart=on-failure
 RestartSec=5s
 

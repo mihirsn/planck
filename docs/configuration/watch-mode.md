@@ -109,13 +109,14 @@ For a true "set and forget" deployment that automatically restarts if your serve
 
 #### If you installed via `.deb` or `.rpm`
 
-The systemd service file is already installed. The `ExecStart` is simply `planck watch` — no container name is hardcoded. Just make sure the `docker` field is set with your container name under `watch` in your `planck.yml`, then enable it:
+The systemd service file is already installed. The `ExecStart` is simply `planck watch` — no container name is hardcoded. 
+
+To start the daemon, you must place your config file in the global directory:
+1. Create your config file: `sudo mkdir -p /etc/planck && sudo nano /etc/planck/planck.yml`
+2. Make sure the `docker` field is set with your container name under `watch`
 
 ```bash
-# Confirm your planck.yml has the docker container set
-cat /etc/planck/planck.yml
-
-# Enable and start
+# Enable and start the background daemon
 sudo systemctl daemon-reload
 sudo systemctl enable planck
 sudo systemctl start planck
@@ -136,7 +137,7 @@ Requires=docker.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/planck watch
+ExecStart=/usr/local/bin/planck watch --config /etc/planck/planck.yml
 Restart=on-failure
 RestartSec=5s
 User=root
