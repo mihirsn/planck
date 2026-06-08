@@ -24,6 +24,9 @@ type Config struct {
 
 // WatchConfig controls the polling behaviour.
 type WatchConfig struct {
+	// Docker is the Docker container name or ID to watch.
+	// Can be overridden at runtime with the --docker CLI flag.
+	Docker string `yaml:"docker"`
 	// Interval is how often Planck polls logs (e.g. "60s", "2m"). Default: 60s.
 	Interval string `yaml:"interval"`
 	// AlertCooldown prevents repeated alerts for the same breach (e.g. "10m"). Default: 10m.

@@ -1,4 +1,5 @@
 watch:
+  docker: my-api
   interval: 30s
   alert_cooldown: 5m
   preset: fastapi
