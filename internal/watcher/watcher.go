@@ -128,8 +128,8 @@ func (w *Watcher) evaluate(report metrics.Report) {
 	if cfg.RPS > 0 && report.AvgRPS >= cfg.RPS {
 		w.maybeAlert(
 			"global:rps",
-			"📡 Planck Alert — High Traffic",
-			fmt.Sprintf("RPS is %.2f (threshold: %.0f)\nContainer: %s", report.AvgRPS, cfg.RPS, w.container),
+			"Planck - High Traffic",
+			fmt.Sprintf("**Container:** %s\n**RPS:** %.2f (Threshold: %.0f)", w.container, report.AvgRPS, cfg.RPS),
 		)
 	}
 
@@ -138,9 +138,9 @@ func (w *Watcher) evaluate(report metrics.Report) {
 		if cfg.ErrorRatePct > 0 && ep.ErrorRate >= cfg.ErrorRatePct {
 			w.maybeAlert(
 				"endpoint:error:"+ep.Path,
-				"📡 Planck Alert — High Error Rate",
-				fmt.Sprintf("%s has a high error rate: %.1f%% (threshold: %.0f%%)\nContainer: %s",
-					ep.Path, ep.ErrorRate, cfg.ErrorRatePct, w.container),
+				"Planck - High Error Rate",
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)",
+					w.container, ep.Path, ep.ErrorRate, cfg.ErrorRatePct),
 			)
 		}
 	}
@@ -149,9 +149,9 @@ func (w *Watcher) evaluate(report metrics.Report) {
 		if cfg.P95LatencyMs > 0 && ep.P95LatencyMs >= cfg.P95LatencyMs {
 			w.maybeAlert(
 				"endpoint:p95:"+ep.Path,
-				"📡 Planck Alert — High Latency",
-				fmt.Sprintf("%s p95 latency is %.0fms (threshold: %.0fms)\nContainer: %s",
-					ep.Path, ep.P95LatencyMs, cfg.P95LatencyMs, w.container),
+				"Planck - High Latency",
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)",
+					w.container, ep.Path, ep.P95LatencyMs, cfg.P95LatencyMs),
 			)
 		}
 	}

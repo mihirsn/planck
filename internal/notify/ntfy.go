@@ -39,7 +39,8 @@ func (c *Client) Send(title, message string) error {
 	req.Header.Set("Title", title)
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("Priority", "high")
-	req.Header.Set("Tags", "warning,chart_with_upwards_trend")
+	req.Header.Set("Tags", "exclamation")
+	req.Header.Set("Markdown", "yes")
 
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
