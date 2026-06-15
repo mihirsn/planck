@@ -1,12 +1,12 @@
 watch:
-  docker: enterprise-billing-backend-1
-  interval: 30s
-  alert_cooldown: 5m
+  docker: my-api
+  interval: 60s
+  alert_cooldown: 10m
   preset: fastapi
 
 alerts:
-  error_rate_pct: 5.0
-  p95_latency_ms: 500
+  error_rate_pct: 10.0
+  p95_latency_ms: 2000
   rps: 200
   
   # Optional: Filter which endpoints trigger alerts
@@ -16,5 +16,5 @@ alerts:
   #   - "/api/v1"
 
 notify:
-  ntfy_topic: planck-alerts
+  ntfy_topic: my-api-alerts
   ntfy_server: https://ntfy.sh
