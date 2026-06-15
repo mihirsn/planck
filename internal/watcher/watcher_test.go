@@ -273,3 +273,77 @@ func TestWatcher_StopsCleanly(t *testing.T) {
 		t.Errorf("expected 'stopped' in output, got: %s", out.String())
 	}
 }
+
+func TestWatcher_EndpointFiltering_Exclude(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// Both are 500s. /api/orders should alert, /health should be excluded.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/api/orders","status":500,"latency_ms":120}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"GET","path":"/health","status":500,"latency_ms":120}`,
+	}
+
+	var out bytes.Buffer
+	cfg := makeConfig(t, srv.URL, func(c *config.Config) {
+		c.Alerts.ExcludePaths = []string{"/health"}
+		c.Watch.IntervalDuration = 50 * time.Millisecond
+		c.Watch.CooldownDuration = 1 * time.Hour
+	})
+
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, lines)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	count := atomic.LoadInt32(&alertCount)
+	if count != 1 {
+		t.Errorf("expected exactly 1 alert (for /api/orders), got %d. Output: %s", count, out.String())
+	}
+}
+
+func TestWatcher_EndpointFiltering_Include(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// Both are 500s. Only /api/v1 should alert.
+	lines := []string{
+		`{"timestamp":"2026-05-08T14:00:01Z","method":"GET","path":"/api/v1/orders","status":500,"latency_ms":120}`,
+		`{"timestamp":"2026-05-08T14:00:02Z","method":"GET","path":"/api/v2/orders","status":500,"latency_ms":120}`,
+	}
+
+	var out bytes.Buffer
+	cfg := makeConfig(t, srv.URL, func(c *config.Config) {
+		c.Alerts.IncludePaths = []string{"/api/v1"}
+		c.Watch.IntervalDuration = 50 * time.Millisecond
+		c.Watch.CooldownDuration = 1 * time.Hour
+	})
+
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, lines)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	count := atomic.LoadInt32(&alertCount)
+	if count != 1 {
+		t.Errorf("expected exactly 1 alert (for /api/v1/orders), got %d. Output: %s", count, out.String())
+	}
+}
