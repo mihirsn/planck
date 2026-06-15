@@ -1,5 +1,5 @@
 watch:
-  docker: my-api
+  docker: enterprise-billing-backend-1
   interval: 30s
   alert_cooldown: 5m
   preset: fastapi
@@ -8,6 +8,12 @@ alerts:
   error_rate_pct: 5.0
   p95_latency_ms: 500
   rps: 200
+  
+  # Optional: Filter which endpoints trigger alerts
+  # exclude_paths:
+  #   - "/health"
+  # include_paths:
+  #   - "/api/v1"
 
 notify:
   ntfy_topic: planck-alerts

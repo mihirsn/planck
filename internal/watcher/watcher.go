@@ -120,6 +120,30 @@ func (w *Watcher) poll() {
 	w.evaluate(report)
 }
 
+// shouldAlertOnPath determines if an endpoint should trigger an alert based on include/exclude paths.
+func (w *Watcher) shouldAlertOnPath(path string) bool {
+	cfg := w.cfg.Alerts
+
+	// Exclude list always wins
+	for _, exclude := range cfg.ExcludePaths {
+		if strings.HasPrefix(path, exclude) {
+			return false
+		}
+	}
+
+	// If Include list is present, it must match at least one
+	if len(cfg.IncludePaths) > 0 {
+		for _, include := range cfg.IncludePaths {
+			if strings.HasPrefix(path, include) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return true
+}
+
 // evaluate checks the report against configured thresholds and fires alerts as needed.
 func (w *Watcher) evaluate(report metrics.Report) {
 	cfg := w.cfg.Alerts
@@ -135,6 +159,9 @@ func (w *Watcher) evaluate(report metrics.Report) {
 
 	// Per-endpoint: error rate and p95 latency
 	for _, ep := range report.ErrorEndpoints {
+		if !w.shouldAlertOnPath(ep.Path) {
+			continue
+		}
 		if cfg.ErrorRatePct > 0 && ep.ErrorRate >= cfg.ErrorRatePct {
 			w.maybeAlert(
 				"endpoint:error:"+ep.Path,
@@ -146,6 +173,9 @@ func (w *Watcher) evaluate(report metrics.Report) {
 	}
 
 	for _, ep := range report.SlowEndpoints {
+		if !w.shouldAlertOnPath(ep.Path) {
+			continue
+		}
 		if cfg.P95LatencyMs > 0 && ep.P95LatencyMs >= cfg.P95LatencyMs {
 			w.maybeAlert(
 				"endpoint:p95:"+ep.Path,
