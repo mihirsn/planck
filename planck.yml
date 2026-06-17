@@ -1,14 +1,20 @@
 watch:
   docker: my-api
-  interval: 30s
-  alert_cooldown: 5m
+  interval: 60s
+  alert_cooldown: 10m
   preset: fastapi
 
 alerts:
-  error_rate_pct: 5.0
-  p95_latency_ms: 500
+  error_rate_pct: 10.0
+  p95_latency_ms: 2000
   rps: 200
+  
+  # Optional: Filter which endpoints trigger alerts
+  # exclude_paths:
+  #   - "/health"
+  # include_paths:
+  #   - "/api/v1"
 
 notify:
-  ntfy_topic: planck-alerts
+  ntfy_topic: my-api-alerts
   ntfy_server: https://ntfy.sh

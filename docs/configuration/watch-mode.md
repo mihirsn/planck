@@ -60,6 +60,30 @@ Planck searches for `planck.yml` in this order:
 
 > All `alerts` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
 
+## Endpoint Filtering
+
+You can optionally filter which API endpoints trigger alerts. This allows you to ignore noisy internal endpoints or restrict alerts exclusively to critical paths.
+
+```yaml
+alerts:
+  # ... your thresholds
+  
+  # Ignore alerts for these paths (e.g. /health, /health/db)
+  exclude_paths:
+    - "/health"
+    - "/metrics"
+
+  # Only trigger alerts for these paths. 
+  # If omitted, all paths not excluded are allowed.
+  include_paths:
+    - "/api/v1"
+```
+
+**Behavior Rules:**
+- Excludes act as a hard override. An endpoint **MUST NOT** match any `exclude_paths` to trigger an alert.
+- If `include_paths` is provided, the endpoint **MUST** match at least one of them.
+- Filtering only suppresses alerts; the global Requests Per Second (RPS) calculation and terminal output remain accurate for all traffic.
+
 ## Using a Custom Config Path
 
 ```bash

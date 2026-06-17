@@ -47,6 +47,10 @@ type AlertConfig struct {
 	P95LatencyMs float64 `yaml:"p95_latency_ms"`
 	// RPS triggers an alert if requests-per-second exceed this value.
 	RPS float64 `yaml:"rps"`
+	// ExcludePaths ignores alerts for endpoints matching these prefixes.
+	ExcludePaths []string `yaml:"exclude_paths,omitempty"`
+	// IncludePaths restricts alerts strictly to endpoints matching these prefixes.
+	IncludePaths []string `yaml:"include_paths,omitempty"`
 }
 
 // NotifyConfig holds ntfy connection details.
