@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.7] - 2026-06-17
+
+### Added
+- **Granular Endpoint Filters** — `planck watch` now supports `include_paths` and `exclude_paths` independently on a per-alert basis. You can now disable latency alerts for noisy long-polling endpoints without losing visibility into their error rates!
+
+### Fixed
+- **Notification Formatting** — removed markdown code block backticks from ntfy alert bodies so values render in clean, native system fonts.
+
 ## [0.2.5] - 2026-06-08
 
 ### Fixed
