@@ -1,20 +1,24 @@
 watch:
-  docker: my-api
-  interval: 60s
+  docker: enterprise-billing-backend-1
+  interval: 5s
   alert_cooldown: 10m
   preset: fastapi
 
 alerts:
-  error_rate_pct: 10.0
-  p95_latency_ms: 2000
   rps: 200
-  
-  # Optional: Filter which endpoints trigger alerts
-  # exclude_paths:
-  #   - "/health"
-  # include_paths:
-  #   - "/api/v1"
+
+  error_rate:
+    threshold: 10.0
+    exclude_paths:
+      - "/health"
+    include_paths:
+      - "/api/v1/orders/customer/filter"
+
+  p95_latency:
+    threshold: 2000
+    exclude_paths:
+      - "/api/upload"
 
 notify:
-  ntfy_topic: my-api-alerts
+  ntfy_topic: planck-alerts
   ntfy_server: https://ntfy.sh

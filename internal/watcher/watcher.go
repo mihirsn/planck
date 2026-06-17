@@ -121,26 +121,25 @@ func (w *Watcher) poll() {
 }
 
 // shouldAlertOnPath determines if an endpoint should trigger an alert based on include/exclude paths.
-func (w *Watcher) shouldAlertOnPath(path string) bool {
-	cfg := w.cfg.Alerts
-
-	// Exclude list always wins
-	for _, exclude := range cfg.ExcludePaths {
+func (w *Watcher) shouldAlertOnPath(path string, rule config.AlertRule) bool {
+	// Excludes act as a hard override
+	for _, exclude := range rule.ExcludePaths {
 		if strings.HasPrefix(path, exclude) {
-			return false
+			return false // Never alert on excluded paths
 		}
 	}
 
-	// If Include list is present, it must match at least one
-	if len(cfg.IncludePaths) > 0 {
-		for _, include := range cfg.IncludePaths {
+	// If include_paths is defined, the path MUST match at least one of them
+	if len(rule.IncludePaths) > 0 {
+		for _, include := range rule.IncludePaths {
 			if strings.HasPrefix(path, include) {
-				return true
+				return true // Matched an include path
 			}
 		}
-		return false
+		return false // Did not match any include paths
 	}
 
+	// No include paths defined, so all non-excluded paths are allowed
 	return true
 }
 
@@ -159,29 +158,27 @@ func (w *Watcher) evaluate(report metrics.Report) {
 
 	// Per-endpoint: error rate and p95 latency
 	for _, ep := range report.ErrorEndpoints {
-		if !w.shouldAlertOnPath(ep.Path) {
+		if !w.shouldAlertOnPath(ep.Path, cfg.ErrorRate) {
 			continue
 		}
-		if cfg.ErrorRatePct > 0 && ep.ErrorRate >= cfg.ErrorRatePct {
+		if cfg.ErrorRate.Threshold > 0 && ep.ErrorRate >= cfg.ErrorRate.Threshold {
 			w.maybeAlert(
-				"endpoint:error:"+ep.Path,
-				"Planck - High Error Rate",
-				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)",
-					w.container, ep.Path, ep.ErrorRate, cfg.ErrorRatePct),
+				fmt.Sprintf("endpoint:error:%s", ep.Path),
+				"Planck: High Error Rate",
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)", w.container, ep.Path, ep.ErrorRate, cfg.ErrorRate.Threshold),
 			)
 		}
 	}
 
 	for _, ep := range report.SlowEndpoints {
-		if !w.shouldAlertOnPath(ep.Path) {
+		if !w.shouldAlertOnPath(ep.Path, cfg.P95Latency) {
 			continue
 		}
-		if cfg.P95LatencyMs > 0 && ep.P95LatencyMs >= cfg.P95LatencyMs {
+		if cfg.P95Latency.Threshold > 0 && float64(ep.P95LatencyMs) >= cfg.P95Latency.Threshold {
 			w.maybeAlert(
-				"endpoint:p95:"+ep.Path,
-				"Planck - High Latency",
-				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)",
-					w.container, ep.Path, ep.P95LatencyMs, cfg.P95LatencyMs),
+				fmt.Sprintf("endpoint:latency:%s", ep.Path),
+				"Planck: High Latency",
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)", w.container, ep.Path, ep.P95LatencyMs, cfg.P95Latency.Threshold),
 			)
 		}
 	}
@@ -225,11 +222,11 @@ func timestamp() string {
 // (i.e. non-zero). Returns an empty string if no thresholds are set.
 func formatAlerts(a config.AlertConfig) string {
 	var parts []string
-	if a.ErrorRatePct > 0 {
-		parts = append(parts, fmt.Sprintf("error_rate≥%.0f%%", a.ErrorRatePct))
+	if a.ErrorRate.Threshold > 0 {
+		parts = append(parts, fmt.Sprintf("error_rate≥%.0f%%", a.ErrorRate.Threshold))
 	}
-	if a.P95LatencyMs > 0 {
-		parts = append(parts, fmt.Sprintf("p95≥%.0fms", a.P95LatencyMs))
+	if a.P95Latency.Threshold > 0 {
+		parts = append(parts, fmt.Sprintf("p95≥%.0fms", a.P95Latency.Threshold))
 	}
 	if a.RPS > 0 {
 		parts = append(parts, fmt.Sprintf("rps≥%.0f", a.RPS))

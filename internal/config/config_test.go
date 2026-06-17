@@ -28,8 +28,10 @@ watch:
   preset: fastapi
 
 alerts:
-  error_rate_pct: 5.0
-  p95_latency_ms: 1000
+  error_rate:
+    threshold: 5.0
+  p95_latency:
+    threshold: 1000
   rps: 50
 
 notify:
@@ -47,8 +49,8 @@ notify:
 	if cfg.Watch.CooldownDuration != 5*time.Minute {
 		t.Errorf("expected 5m cooldown, got %v", cfg.Watch.CooldownDuration)
 	}
-	if cfg.Alerts.ErrorRatePct != 5.0 {
-		t.Errorf("expected error_rate_pct=5.0, got %v", cfg.Alerts.ErrorRatePct)
+	if cfg.Alerts.ErrorRate.Threshold != 5.0 {
+		t.Errorf("expected error_rate.threshold=5.0, got %v", cfg.Alerts.ErrorRate.Threshold)
 	}
 	if cfg.Notify.NtfyTopic != "my-alerts" {
 		t.Errorf("expected topic=my-alerts, got %q", cfg.Notify.NtfyTopic)
@@ -142,29 +144,31 @@ notify:
 	}
 }
 
-func TestValidate_ErrorRatePctOutOfRange(t *testing.T) {
+func TestValidate_ErrorRateThresholdOutOfRange(t *testing.T) {
 	path := writeConfig(t, `
 alerts:
-  error_rate_pct: 150.0
+  error_rate:
+    threshold: 150.0
 notify:
   ntfy_topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
-		t.Error("expected error for error_rate_pct > 100")
+		t.Error("expected error for error_rate.threshold > 100")
 	}
 }
 
 func TestValidate_NegativeP95(t *testing.T) {
 	path := writeConfig(t, `
 alerts:
-  p95_latency_ms: -1
+  p95_latency:
+    threshold: -1
 notify:
   ntfy_topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
-		t.Error("expected error for negative p95_latency_ms")
+		t.Error("expected error for negative p95_latency.threshold")
 	}
 }
 
