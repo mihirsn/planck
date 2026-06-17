@@ -165,7 +165,7 @@ func (w *Watcher) evaluate(report metrics.Report) {
 			w.maybeAlert(
 				fmt.Sprintf("endpoint:error:%s", ep.Path),
 				"Planck: High Error Rate",
-				fmt.Sprintf("**Container:** `%s`\n**Endpoint:** `%s`\n**Rate:** `%.1f%%` (Threshold: `%.0f%%`)", w.container, ep.Path, ep.ErrorRate, cfg.ErrorRate.Threshold),
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)", w.container, ep.Path, ep.ErrorRate, cfg.ErrorRate.Threshold),
 			)
 		}
 	}
@@ -178,7 +178,7 @@ func (w *Watcher) evaluate(report metrics.Report) {
 			w.maybeAlert(
 				fmt.Sprintf("endpoint:latency:%s", ep.Path),
 				"Planck: High Latency",
-				fmt.Sprintf("**Container:** `%s`\n**Endpoint:** `%s`\n**P95 Latency:** `%.0fms` (Threshold: `%.0fms`)", w.container, ep.Path, ep.P95LatencyMs, cfg.P95Latency.Threshold),
+				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)", w.container, ep.Path, ep.P95LatencyMs, cfg.P95Latency.Threshold),
 			)
 		}
 	}
