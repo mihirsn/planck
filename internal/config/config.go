@@ -39,18 +39,21 @@ type WatchConfig struct {
 	CooldownDuration time.Duration `yaml:"-"`
 }
 
+// AlertRule defines thresholds and endpoint filters for a specific alert type.
+type AlertRule struct {
+	Threshold    float64  `yaml:"threshold"`
+	ExcludePaths []string `yaml:"exclude_paths,omitempty"`
+	IncludePaths []string `yaml:"include_paths,omitempty"`
+}
+
 // AlertConfig holds optional threshold values. Zero value means "not configured".
 type AlertConfig struct {
-	// ErrorRatePct triggers an alert if any endpoint's error rate exceeds this percentage.
-	ErrorRatePct float64 `yaml:"error_rate_pct"`
-	// P95LatencyMs triggers an alert if any endpoint's p95 latency exceeds this (in ms).
-	P95LatencyMs float64 `yaml:"p95_latency_ms"`
+	// ErrorRate triggers an alert if any endpoint's error rate exceeds its threshold percentage.
+	ErrorRate AlertRule `yaml:"error_rate"`
+	// P95Latency triggers an alert if any endpoint's p95 latency exceeds its threshold (in ms).
+	P95Latency AlertRule `yaml:"p95_latency"`
 	// RPS triggers an alert if requests-per-second exceed this value.
 	RPS float64 `yaml:"rps"`
-	// ExcludePaths ignores alerts for endpoints matching these prefixes.
-	ExcludePaths []string `yaml:"exclude_paths,omitempty"`
-	// IncludePaths restricts alerts strictly to endpoints matching these prefixes.
-	IncludePaths []string `yaml:"include_paths,omitempty"`
 }
 
 // NotifyConfig holds ntfy connection details.
@@ -128,11 +131,11 @@ func (c *Config) Validate() error {
 	c.Watch.CooldownDuration = cd
 
 	// --- alerts ---
-	if c.Alerts.ErrorRatePct < 0 || c.Alerts.ErrorRatePct > 100 {
-		return fmt.Errorf("alerts.error_rate_pct must be between 0 and 100, got %.2f", c.Alerts.ErrorRatePct)
+	if c.Alerts.ErrorRate.Threshold < 0 || c.Alerts.ErrorRate.Threshold > 100 {
+		return fmt.Errorf("alerts.error_rate.threshold must be between 0 and 100, got %.2f", c.Alerts.ErrorRate.Threshold)
 	}
-	if c.Alerts.P95LatencyMs < 0 {
-		return fmt.Errorf("alerts.p95_latency_ms must be >= 0, got %.2f", c.Alerts.P95LatencyMs)
+	if c.Alerts.P95Latency.Threshold < 0 {
+		return fmt.Errorf("alerts.p95_latency.threshold must be >= 0, got %.2f", c.Alerts.P95Latency.Threshold)
 	}
 	if c.Alerts.RPS < 0 {
 		return fmt.Errorf("alerts.rps must be >= 0, got %.2f", c.Alerts.RPS)

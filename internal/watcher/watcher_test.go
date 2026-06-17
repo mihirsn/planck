@@ -40,9 +40,13 @@ func makeConfig(t *testing.T, ntfyURL string, opts ...func(*config.Config)) *con
 			Preset:           "",
 		},
 		Alerts: config.AlertConfig{
-			ErrorRatePct: 10.0,
-			P95LatencyMs: 500.0,
-			RPS:          1000.0,
+			ErrorRate: config.AlertRule{
+				Threshold: 10.0,
+			},
+			P95Latency: config.AlertRule{
+				Threshold: 500.0,
+			},
+			RPS: 1000.0,
 		},
 		Notify: config.NotifyConfig{
 			NtfyTopic:  "test-topic",
@@ -291,7 +295,7 @@ func TestWatcher_EndpointFiltering_Exclude(t *testing.T) {
 
 	var out bytes.Buffer
 	cfg := makeConfig(t, srv.URL, func(c *config.Config) {
-		c.Alerts.ExcludePaths = []string{"/health"}
+		c.Alerts.ErrorRate.ExcludePaths = []string{"/health"}
 		c.Watch.IntervalDuration = 50 * time.Millisecond
 		c.Watch.CooldownDuration = 1 * time.Hour
 	})
@@ -328,7 +332,7 @@ func TestWatcher_EndpointFiltering_Include(t *testing.T) {
 
 	var out bytes.Buffer
 	cfg := makeConfig(t, srv.URL, func(c *config.Config) {
-		c.Alerts.IncludePaths = []string{"/api/v1"}
+		c.Alerts.ErrorRate.IncludePaths = []string{"/api/v1"}
 		c.Watch.IntervalDuration = 50 * time.Millisecond
 		c.Watch.CooldownDuration = 1 * time.Hour
 	})

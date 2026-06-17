@@ -16,9 +16,11 @@ watch:
   preset: fastapi        # Your log format preset
 
 alerts:
-  error_rate_pct: 10.0   # Alert if any endpoint exceeds 10% error rate
-  p95_latency_ms: 2000   # Alert if any endpoint's p95 latency exceeds 2s
   rps: 200               # Alert if requests per second exceeds 200
+  error_rate:
+    threshold: 10.0      # Alert if any endpoint exceeds 10% error rate
+  p95_latency:
+    threshold: 2000      # Alert if any endpoint's p95 latency exceeds 2s
 
 notify:
   ntfy_topic: my-api-alerts        # Your ntfy topic name
@@ -51,9 +53,13 @@ Planck searches for `planck.yml` in this order:
 | `watch.interval` | duration | `60s` | How often to poll logs |
 | `watch.alert_cooldown` | duration | `10m` | Minimum time between repeat alerts for the same threshold |
 | `watch.preset` | string | — | Log format preset (same as `--preset` on `analyze`) |
-| `alerts.error_rate_pct` | float | — | Alert if any endpoint's error rate exceeds this % |
-| `alerts.p95_latency_ms` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
 | `alerts.rps` | float | — | Alert if requests per second exceeds this value |
+| `alerts.error_rate.threshold` | float | — | Alert if any endpoint's error rate exceeds this % |
+| `alerts.error_rate.exclude_paths` | []string | — | Endpoints to ignore for error alerts |
+| `alerts.error_rate.include_paths` | []string | — | Restrict error alerts to only these endpoints |
+| `alerts.p95_latency.threshold` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
+| `alerts.p95_latency.exclude_paths` | []string | — | Endpoints to ignore for latency alerts |
+| `alerts.p95_latency.include_paths` | []string | — | Restrict latency alerts to only these endpoints |
 | `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
 | `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
 | `notify.ntfy_token` | string | — | Bearer token for protected topics |
@@ -62,21 +68,25 @@ Planck searches for `planck.yml` in this order:
 
 ## Endpoint Filtering
 
-You can optionally filter which API endpoints trigger alerts. This allows you to ignore noisy internal endpoints or restrict alerts exclusively to critical paths.
+You can optionally filter which API endpoints trigger alerts on a per-alert basis. This allows you to ignore noisy internal endpoints or allow slow polling endpoints without sacrificing error visibility.
 
 ```yaml
 alerts:
-  # ... your thresholds
-  
-  # Ignore alerts for these paths (e.g. /health, /health/db)
-  exclude_paths:
-    - "/health"
-    - "/metrics"
+  error_rate:
+    threshold: 10.0
+    # Ignore alerts for these paths (e.g. /health)
+    exclude_paths:
+      - "/health"
+    # Only trigger alerts for these paths. 
+    # If omitted, all paths not excluded are allowed.
+    include_paths:
+      - "/api/v1"
 
-  # Only trigger alerts for these paths. 
-  # If omitted, all paths not excluded are allowed.
-  include_paths:
-    - "/api/v1"
+  p95_latency:
+    threshold: 2000
+    # Ignore slow long-polling endpoints from latency alerts
+    exclude_paths:
+      - "/api/upload"
 ```
 
 **Behavior Rules:**

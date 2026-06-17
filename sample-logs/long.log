@@ -1,0 +1,3 @@
+[2026-05-31 10:00:00] INFO /api/v1/some/extremely/long/and/convoluted/path/to/a/resource/that/exceeds/thirty/characters 200 15ms
+[2026-05-31 10:00:01] INFO /api/v1/short 200 10ms
+[2026-05-31 10:00:02] INFO /api/v1/some/extremely/long/and/convoluted/path/to/a/resource/that/exceeds/thirty/characters 500 1000ms
