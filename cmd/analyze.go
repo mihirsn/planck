@@ -188,7 +188,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	var sourceName string
 
 	if flags.docker != "" {
-		dockerSrc, err := source.NewDockerSource(flags.docker, flags.tail, flags.since)
+		dockerSrc, err := source.NewDockerSource(flags.docker, flags.tail, flags.since, flags.until)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			return nil //nolint:nilerr

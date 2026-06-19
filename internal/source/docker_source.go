@@ -15,6 +15,7 @@ type DockerSource struct {
 	container  string
 	tail       int
 	since      string
+	until      string
 	cmdBuilder func(name string, args ...string) *exec.Cmd // injectable for testing
 }
 
@@ -22,9 +23,10 @@ type DockerSource struct {
 //
 // tail: number of lines to fetch (0 = all lines).
 // since: fetch logs newer than this duration/timestamp (empty = all).
+// until: fetch logs older than this duration/timestamp (empty = all).
 //
 // Returns an error if Docker CLI is not available on PATH.
-func NewDockerSource(container string, tail int, since string) (*DockerSource, error) {
+func NewDockerSource(container string, tail int, since string, until string) (*DockerSource, error) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return nil, fmt.Errorf(
 			"Docker CLI not found.\nPlease install Docker or use file input mode.",
@@ -34,17 +36,19 @@ func NewDockerSource(container string, tail int, since string) (*DockerSource, e
 		container:  container,
 		tail:       tail,
 		since:      since,
+		until:      until,
 		cmdBuilder: exec.Command,
 	}, nil
 }
 
 // newDockerSourceWithBuilder creates a DockerSource with a custom command builder.
 // This is used only in tests to avoid needing a real Docker daemon.
-func newDockerSourceWithBuilder(container string, tail int, since string, builder func(string, ...string) *exec.Cmd) *DockerSource {
+func newDockerSourceWithBuilder(container string, tail int, since string, until string, builder func(string, ...string) *exec.Cmd) *DockerSource {
 	return &DockerSource{
 		container:  container,
 		tail:       tail,
 		since:      since,
+		until:      until,
 		cmdBuilder: builder,
 	}
 }
@@ -122,6 +126,10 @@ func (d *DockerSource) buildArgs() []string {
 
 	if d.since != "" {
 		args = append(args, "--since", normalizeSince(d.since))
+	}
+
+	if d.until != "" {
+		args = append(args, "--until", normalizeSince(d.until))
 	}
 
 	args = append(args, d.container)

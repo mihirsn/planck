@@ -10,7 +10,7 @@ import (
 func TestBuildArgs_NoTailNoSince(t *testing.T) {
 	t.Parallel()
 
-	src := newDockerSourceWithBuilder("my-container", 0, "", exec.Command)
+	src := newDockerSourceWithBuilder("my-container", 0, "", "", exec.Command)
 	got := src.BuildArgs()
 	want := []string{"logs", "my-container"}
 
@@ -23,7 +23,7 @@ func TestBuildArgs_NoTailNoSince(t *testing.T) {
 func TestBuildArgs_WithTail(t *testing.T) {
 	t.Parallel()
 
-	src := newDockerSourceWithBuilder("api", 500, "", exec.Command)
+	src := newDockerSourceWithBuilder("api", 500, "", "", exec.Command)
 	got := src.BuildArgs()
 	want := []string{"logs", "--tail", "500", "api"}
 
@@ -36,7 +36,7 @@ func TestBuildArgs_WithTail(t *testing.T) {
 func TestBuildArgs_WithSince(t *testing.T) {
 	t.Parallel()
 
-	src := newDockerSourceWithBuilder("api", 0, "1h", exec.Command)
+	src := newDockerSourceWithBuilder("api", 0, "1h", "", exec.Command)
 	got := src.BuildArgs()
 	want := []string{"logs", "--since", "1h", "api"}
 
@@ -49,9 +49,22 @@ func TestBuildArgs_WithSince(t *testing.T) {
 func TestBuildArgs_WithTailAndSince(t *testing.T) {
 	t.Parallel()
 
-	src := newDockerSourceWithBuilder("invoice-api", 100, "30m", exec.Command)
+	src := newDockerSourceWithBuilder("invoice-api", 100, "30m", "", exec.Command)
 	got := src.BuildArgs()
 	want := []string{"logs", "--tail", "100", "--since", "30m", "invoice-api"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("BuildArgs() = %v, want %v", got, want)
+	}
+}
+
+// TestBuildArgs_WithUntil verifies --until flag is appended correctly.
+func TestBuildArgs_WithUntil(t *testing.T) {
+	t.Parallel()
+
+	src := newDockerSourceWithBuilder("api", 0, "", "1h", exec.Command)
+	got := src.BuildArgs()
+	want := []string{"logs", "--until", "1h", "api"}
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("BuildArgs() = %v, want %v", got, want)
@@ -68,7 +81,7 @@ func TestDockerSource_Stream_WithEcho(t *testing.T) {
 		return exec.Command("echo", "line-one\nline-two\nline-three")
 	}
 
-	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+	src := newDockerSourceWithBuilder("fake", 0, "", "", fakeBuilder)
 
 	ch, err := src.Stream()
 	if err != nil {
@@ -96,7 +109,7 @@ func TestDockerSource_Stream_ErrorOnStart(t *testing.T) {
 		return exec.Command("/nonexistent/binary/that/does/not/exist")
 	}
 
-	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+	src := newDockerSourceWithBuilder("fake", 0, "", "", fakeBuilder)
 
 	_, err := src.Stream()
 	if err == nil {
@@ -115,7 +128,7 @@ func TestDockerSource_Stream_ReadsStderr(t *testing.T) {
 		return exec.Command("sh", "-c", "echo stderr-line-one >&2 && echo stderr-line-two >&2")
 	}
 
-	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+	src := newDockerSourceWithBuilder("fake", 0, "", "", fakeBuilder)
 
 	ch, err := src.Stream()
 	if err != nil {
@@ -142,7 +155,7 @@ func TestDockerSource_Stream_MergesStdoutAndStderr(t *testing.T) {
 		return exec.Command("sh", "-c", "echo stdout-line && echo stderr-line >&2")
 	}
 
-	src := newDockerSourceWithBuilder("fake", 0, "", fakeBuilder)
+	src := newDockerSourceWithBuilder("fake", 0, "", "", fakeBuilder)
 
 	ch, err := src.Stream()
 	if err != nil {
@@ -161,13 +174,13 @@ func TestDockerSource_Stream_MergesStdoutAndStderr(t *testing.T) {
 
 func TestNewDockerSource(t *testing.T) {
 	// Valid should return source (no validation on container name in constructor)
-	_, err := NewDockerSource("", 0, "")
+	_, err := NewDockerSource("", 0, "", "")
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
 	// Valid should return source
-	src, err := NewDockerSource("my-container", 100, "1h")
+	src, err := NewDockerSource("my-container", 100, "1h", "")
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}

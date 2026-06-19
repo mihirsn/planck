@@ -18,7 +18,7 @@ import (
 
 // SourceFunc is a function that returns a new log source for a given container and since duration.
 // It is a field on Watcher to allow injection in tests.
-type SourceFunc func(container string, tail int, since string) (source.LogSource, error)
+type SourceFunc func(container string, tail int, since string, until string) (source.LogSource, error)
 
 // Watcher continuously polls a log source, evaluates thresholds, and fires alerts.
 type Watcher struct {
@@ -45,8 +45,8 @@ func New(cfg *config.Config, container string, fieldMap models.FieldMap, out io.
 		notifier:  notify.NewClient(cfg.Notify.NtfyServer, cfg.Notify.NtfyTopic, cfg.Notify.NtfyToken),
 		out:       out,
 		cooldowns: make(map[string]time.Time),
-		NewSource: func(container string, tail int, since string) (source.LogSource, error) {
-			return source.NewDockerSource(container, tail, since)
+		NewSource: func(container string, tail int, since string, until string) (source.LogSource, error) {
+			return source.NewDockerSource(container, tail, since, until)
 		},
 	}
 }
@@ -82,7 +82,7 @@ func (w *Watcher) Run(stop <-chan struct{}) {
 func (w *Watcher) poll() {
 	since := durationToSince(w.cfg.Watch.IntervalDuration)
 
-	src, err := w.NewSource(w.container, 0, since)
+	src, err := w.NewSource(w.container, 0, since, "")
 	if err != nil {
 		fmt.Fprintf(w.out, "[%s] ⚠  Failed to open log source: %v\n", timestamp(), err)
 		return

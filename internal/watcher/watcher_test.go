@@ -73,14 +73,14 @@ func defaultFieldMap() models.FieldMap {
 
 // injectSource wires a fake source into the watcher's NewSource function.
 func injectSource(w *watcher.Watcher, lines []string) {
-	w.NewSource = func(container string, tail int, since string) (source.LogSource, error) {
+	w.NewSource = func(container string, tail int, since string, until string) (source.LogSource, error) {
 		return &fakeSource{lines: lines}, nil
 	}
 }
 
-// injectErrorSource makes the source fail to open.
-func injectErrorSource(w *watcher.Watcher) {
-	w.NewSource = func(container string, tail int, since string) (source.LogSource, error) {
+// injectSourceError makes the source fail to open.
+func injectSourceError(w *watcher.Watcher, err error) {
+	w.NewSource = func(container string, tail int, since string, until string) (source.LogSource, error) {
 		return nil, fmt.Errorf("docker: container not found")
 	}
 }
@@ -105,7 +105,7 @@ func TestWatcher_NoEntries(t *testing.T) {
 func TestWatcher_SourceError(t *testing.T) {
 	var out bytes.Buffer
 	w := watcher.New(makeConfig(t, "http://unused"), "bad-container", defaultFieldMap(), &out)
-	injectErrorSource(w)
+	injectSourceError(w, fmt.Errorf("docker: container not found"))
 
 	stop := make(chan struct{})
 	go w.Run(stop)
@@ -233,8 +233,8 @@ func TestWatcher_CooldownPreventsRepeatAlert(t *testing.T) {
 	})
 
 	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
-	// Each poll gets the same failing line.
-	w.NewSource = func(container string, tail int, since string) (source.LogSource, error) {
+	// Provide a fake source that emits 10 lines, then returns EOF to close stream.
+	w.NewSource = func(container string, tail int, since string, until string) (source.LogSource, error) {
 		return &fakeSource{lines: lines}, nil
 	}
 
