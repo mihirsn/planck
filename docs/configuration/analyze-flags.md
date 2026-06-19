@@ -24,6 +24,8 @@ planck analyze app.log --since 12h
 planck analyze app.log --since 2026-05-10T08:00:00Z --until 2026-05-10T18:00:00Z
 ```
 
+> **Timezones:** Planck accepts absolute RFC3339 timestamps and handles timezones seamlessly. For example, if your server logs are in UTC (`+00:00`), and you live in India (IST), you can provide your local time like `--since 2026-05-10T13:30:00+05:30`. Planck will align everything to an absolute time internally to compare correctly!
+
 ## Allowlist Filtering (HTTP Method / Status)
 
 ```bash
