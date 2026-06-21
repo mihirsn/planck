@@ -261,7 +261,7 @@ func (w *Watcher) evaluateResources(stats source.ContainerStats) {
 		w.maybeAlert(
 			"resource:memory:percent",
 			"Planck – High Memory Usage",
-			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (%.1f%%) — exceeded %.0f%% threshold",
+			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (%.1f%%) (Threshold: %.0f%%)",
 				w.container, stats.MemUsedMB, stats.MemLimitMB, stats.MemPercent, res.Memory.Percent),
 		)
 	}
@@ -271,7 +271,7 @@ func (w *Watcher) evaluateResources(stats source.ContainerStats) {
 		w.maybeAlert(
 			"resource:memory:absolute",
 			"Planck – High Memory Usage",
-			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB — exceeded %.0fMB threshold",
+			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (Threshold: %.0fMB)",
 				w.container, stats.MemUsedMB, stats.MemLimitMB, res.Memory.Absolute),
 		)
 	}

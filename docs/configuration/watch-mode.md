@@ -164,7 +164,7 @@ Body:   **Container:** my-api
 
 Title:  Planck – High Memory Usage
 Body:   **Container:** my-api
-        **Memory:** 1600MB / 2048MB (78.1%) — exceeded 75% threshold
+        **Memory:** 1600MB / 2048MB (78.1%) (Threshold: 75%)
 ```
 
 The terminal also prints a heartbeat line on each resource poll:
