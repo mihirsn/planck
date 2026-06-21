@@ -10,7 +10,7 @@
     <img src="https://github.com/mihirsn/planck/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
   <a href="https://github.com/mihirsn/planck/actions/workflows/ci.yml">
-    <img src="https://raw.githubusercontent.com/mihirsn/planck/badges/coverage.svg" alt="Coverage">
+    <img src="https://raw.githubusercontent.com/mihirsn/planck/badges/.badges/main/coverage.svg" alt="Coverage">
   </a>
   <a href="https://github.com/mihirsn/planck/releases/latest">
     <img src="https://img.shields.io/github/v/release/mihirsn/planck" alt="Latest Release">
