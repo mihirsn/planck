@@ -17,9 +17,10 @@ var validTopicRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // Config is the top-level structure of planck.yml.
 type Config struct {
-	Watch  WatchConfig  `yaml:"watch"`
-	Alerts AlertConfig  `yaml:"alerts"`
-	Notify NotifyConfig `yaml:"notify"`
+	Watch     WatchConfig     `yaml:"watch"`
+	Alerts    AlertConfig     `yaml:"alerts"`
+	Resources ResourcesConfig `yaml:"resources"`
+	Notify    NotifyConfig    `yaml:"notify"`
 }
 
 // WatchConfig controls the polling behaviour.
@@ -54,6 +55,35 @@ type AlertConfig struct {
 	P95Latency AlertRule `yaml:"p95_latency"`
 	// RPS triggers an alert if requests-per-second exceed this value.
 	RPS float64 `yaml:"rps"`
+}
+
+// ResourcesConfig holds container-level resource monitoring settings.
+// All fields are optional; omitting the block entirely disables resource alerts.
+type ResourcesConfig struct {
+	// Interval controls how often container stats are polled (e.g. "30s", "1m").
+	// Defaults to watch.interval when omitted.
+	Interval string `yaml:"interval"`
+	// CPU holds the CPU usage threshold.
+	CPU CPUThreshold `yaml:"cpu"`
+	// Memory holds the memory usage thresholds.
+	Memory MemThreshold `yaml:"memory"`
+
+	// IntervalDuration is the parsed form of Interval — populated by Validate().
+	IntervalDuration time.Duration `yaml:"-"`
+}
+
+// CPUThreshold triggers an alert when the container's CPU usage >= Threshold percent.
+type CPUThreshold struct {
+	// Threshold is the CPU usage percentage (0–100) that triggers an alert.
+	Threshold float64 `yaml:"threshold"`
+}
+
+// MemThreshold triggers an alert when EITHER the percent OR absolute condition is met.
+type MemThreshold struct {
+	// Percent triggers an alert when memory usage >= this percentage of the container's limit.
+	Percent float64 `yaml:"percent"`
+	// Absolute triggers an alert when memory usage >= this value in MB.
+	Absolute float64 `yaml:"absolute"`
 }
 
 // NotifyConfig holds ntfy connection details.
@@ -139,6 +169,28 @@ func (c *Config) Validate() error {
 	}
 	if c.Alerts.RPS < 0 {
 		return fmt.Errorf("alerts.rps must be >= 0, got %.2f", c.Alerts.RPS)
+	}
+
+	// --- resources ---
+	resInterval := c.Resources.Interval
+	if resInterval == "" {
+		// Default to watch.interval when not explicitly set.
+		resInterval = interval
+	}
+	rd, err := time.ParseDuration(resInterval)
+	if err != nil || rd <= 0 {
+		return fmt.Errorf("resources.interval %q must be a positive duration (e.g. \"30s\", \"1m\")", resInterval)
+	}
+	c.Resources.IntervalDuration = rd
+
+	if c.Resources.CPU.Threshold < 0 || c.Resources.CPU.Threshold > 100 {
+		return fmt.Errorf("resources.cpu.threshold must be between 0 and 100, got %.2f", c.Resources.CPU.Threshold)
+	}
+	if c.Resources.Memory.Percent < 0 || c.Resources.Memory.Percent > 100 {
+		return fmt.Errorf("resources.memory.percent must be between 0 and 100, got %.2f", c.Resources.Memory.Percent)
+	}
+	if c.Resources.Memory.Absolute < 0 {
+		return fmt.Errorf("resources.memory.absolute must be >= 0, got %.2f", c.Resources.Memory.Absolute)
 	}
 
 	// --- notify.ntfy_topic ---
