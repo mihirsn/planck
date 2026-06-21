@@ -1,5 +1,5 @@
 watch:
-  docker: enterprise-billing-backend-1
+  docker: mp-api
   interval: 5s
   alert_cooldown: 10m
   preset: fastapi
@@ -12,7 +12,7 @@ alerts:
     exclude_paths:
       - "/health"
     include_paths:
-      - "/api/v1/orders/customer/filter"
+      - "/api/v1/checkout"
 
   p95_latency:
     threshold: 2000
