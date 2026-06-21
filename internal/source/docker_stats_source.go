@@ -105,7 +105,7 @@ func (d *DockerStatsSource) Collect() (ContainerStats, error) {
 }
 
 // parsePercent strips a trailing "%" and parses the float value.
-// e.g. "12.34%" → 12.34
+// e.g. "12.34%" → 12.34.
 func parsePercent(s string) (float64, error) {
 	s = strings.TrimSpace(strings.TrimSuffix(s, "%"))
 	return strconv.ParseFloat(s, 64)
@@ -113,7 +113,7 @@ func parsePercent(s string) (float64, error) {
 
 // parseMemUsage parses Docker's "<used> / <limit>" memory string into MB values.
 // Docker emits values with units like "MiB", "GiB", "MB", "GB", "kB", "B".
-// e.g. "512MiB / 2GiB" → (512.0, 2048.0, nil)
+// e.g. "512MiB / 2GiB" → (512.0, 2048.0, nil).
 func parseMemUsage(s string) (usedMB, limitMB float64, err error) {
 	parts := strings.SplitN(s, "/", 2)
 	if len(parts) != 2 {
