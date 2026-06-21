@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-06-21
+
+### Added
+- **Resource Monitoring Alerts** — `planck watch` can now monitor and alert on container CPU and Memory usage independently of log polling. 
+  - Add `resources:` to your config to define `cpu` thresholds and `memory` thresholds (both `percent` and `absolute` MB).
+  - Uses `docker stats` directly under the hood — zero SDK bloat, minimal footprint.
+  - Resource alerts respect the global `alert_cooldown` to prevent notification spam.
+
+### Changed
+- GitHub Actions workflows updated to resolve Node 20 deprecation warnings.
+- `planck.yml` removed from git tracking to allow purely local configurations.
+
+---
+
 ## [0.2.7] - 2026-06-17
 
 ### Added
@@ -149,6 +163,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/mihirsn/planck/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mihirsn/planck/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mihirsn/planck/compare/v0.2.7...v0.3.0
+[0.2.7]: https://github.com/mihirsn/planck/compare/v0.2.5...v0.2.7
+[0.2.5]: https://github.com/mihirsn/planck/compare/v0.2.4...v0.2.5
+[0.2.4]: https://github.com/mihirsn/planck/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/mihirsn/planck/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/mihirsn/planck/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/mihirsn/planck/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/mihirsn/planck/compare/v0.1.4...v0.2.0
+[0.1.4]: https://github.com/mihirsn/planck/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/mihirsn/planck/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/mihirsn/planck/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mihirsn/planck/releases/tag/v0.1.0
