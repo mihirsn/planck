@@ -351,3 +351,280 @@ func TestWatcher_EndpointFiltering_Include(t *testing.T) {
 		t.Errorf("expected exactly 1 alert (for /api/v1/orders), got %d. Output: %s", count, out.String())
 	}
 }
+
+// --- Resource alert tests ---
+
+// fakeStatsSource implements source.StatsSource for testing.
+type fakeStatsSource struct {
+	stats source.ContainerStats
+	err   error
+}
+
+func (f *fakeStatsSource) Collect() (source.ContainerStats, error) {
+	return f.stats, f.err
+}
+
+// injectStatsSource wires a fake stats source into the watcher.
+func injectStatsSource(w *watcher.Watcher, stats source.ContainerStats, collectErr error) {
+	w.NewStatsSource = func(container string) (source.StatsSource, error) {
+		return &fakeStatsSource{stats: stats, err: collectErr}, nil
+	}
+}
+
+// makeConfigWithResources extends makeConfig with resource thresholds.
+func makeConfigWithResources(t *testing.T, ntfyURL string, res config.ResourcesConfig) *config.Config {
+	t.Helper()
+	cfg := makeConfig(t, ntfyURL)
+	if res.IntervalDuration == 0 {
+		res.IntervalDuration = 30 * time.Millisecond
+	}
+	cfg.Resources = res
+	return cfg
+}
+
+func TestWatcher_ResourceAlert_CPUBreach(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		CPU: config.CPUThreshold{Threshold: 80},
+	})
+	cfg.Watch.CooldownDuration = 1 * time.Millisecond
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{
+		CPUPercent:    87.5,
+		MemUsedMB:     256,
+		MemLimitMB:    1024,
+		MemPercent:    25.0,
+		ContainerName: "my-api",
+	}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if atomic.LoadInt32(&alertCount) == 0 {
+		t.Errorf("expected CPU alert to fire, got none. Output: %s", out.String())
+	}
+	if !strings.Contains(out.String(), "CPU") {
+		t.Errorf("expected 'CPU' mention in output, got: %s", out.String())
+	}
+}
+
+func TestWatcher_ResourceAlert_CPUBelowThreshold_NoAlert(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		CPU: config.CPUThreshold{Threshold: 80},
+	})
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{
+		CPUPercent: 45.0,
+		MemPercent: 20.0,
+	}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if count := atomic.LoadInt32(&alertCount); count > 0 {
+		t.Errorf("expected no alert when CPU is below threshold, got %d", count)
+	}
+}
+
+func TestWatcher_ResourceAlert_MemoryPercentBreach(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		Memory: config.MemThreshold{Percent: 75},
+	})
+	cfg.Watch.CooldownDuration = 1 * time.Millisecond
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{
+		MemUsedMB:  1600,
+		MemLimitMB: 2048,
+		MemPercent: 78.1,
+	}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if atomic.LoadInt32(&alertCount) == 0 {
+		t.Errorf("expected memory percent alert to fire, got none. Output: %s", out.String())
+	}
+}
+
+func TestWatcher_ResourceAlert_MemoryAbsoluteBreach(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		Memory: config.MemThreshold{Absolute: 1500},
+	})
+	cfg.Watch.CooldownDuration = 1 * time.Millisecond
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{
+		MemUsedMB:  1800,
+		MemLimitMB: 4096,
+		MemPercent: 43.9,
+	}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if atomic.LoadInt32(&alertCount) == 0 {
+		t.Errorf("expected memory absolute alert to fire, got none. Output: %s", out.String())
+	}
+}
+
+func TestWatcher_ResourceAlert_BothMemoryConditionsTriggerIndependently(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		Memory: config.MemThreshold{Percent: 70, Absolute: 1000},
+	})
+	cfg.Watch.CooldownDuration = 1 * time.Millisecond
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{
+		MemUsedMB:  1200,
+		MemLimitMB: 1600,
+		MemPercent: 75.0,
+	}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	// Two separate cooldown keys — both should fire independently.
+	if count := atomic.LoadInt32(&alertCount); count < 2 {
+		t.Errorf("expected at least 2 alerts (one per memory condition), got %d. Output: %s", count, out.String())
+	}
+}
+
+func TestWatcher_ResourceAlert_CooldownPreventsRepeat(t *testing.T) {
+	var alertCount int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&alertCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := makeConfigWithResources(t, srv.URL, config.ResourcesConfig{
+		CPU:              config.CPUThreshold{Threshold: 50},
+		IntervalDuration: 30 * time.Millisecond,
+	})
+	cfg.Watch.CooldownDuration = 1 * time.Hour
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	injectStatsSource(w, source.ContainerStats{CPUPercent: 95.0}, nil)
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(200 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if count := atomic.LoadInt32(&alertCount); count != 1 {
+		t.Errorf("expected exactly 1 CPU alert (cooldown suppresses repeats), got %d", count)
+	}
+}
+
+func TestWatcher_ResourceAlert_StatsSourceError_NocrashJustWarning(t *testing.T) {
+	cfg := makeConfigWithResources(t, "http://unused", config.ResourcesConfig{
+		CPU: config.CPUThreshold{Threshold: 50},
+	})
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+	w.NewStatsSource = func(container string) (source.StatsSource, error) {
+		return nil, fmt.Errorf("docker: container not found")
+	}
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(100 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if !strings.Contains(out.String(), "Failed to open stats source") {
+		t.Errorf("expected stats source error message in output, got: %s", out.String())
+	}
+}
+
+func TestWatcher_ResourceAlert_NoThresholds_NoResourcePolling(t *testing.T) {
+	cfg := makeConfig(t, "http://unused")
+	cfg.Resources.IntervalDuration = 30 * time.Millisecond
+
+	var out bytes.Buffer
+	w := watcher.New(cfg, "my-api", defaultFieldMap(), &out)
+	injectSource(w, []string{})
+
+	stop := make(chan struct{})
+	go w.Run(stop)
+	time.Sleep(100 * time.Millisecond)
+	close(stop)
+	time.Sleep(50 * time.Millisecond)
+
+	if strings.Contains(out.String(), "Resources \u2014") {
+		t.Errorf("expected no resource poll output when no thresholds are configured, got: %s", out.String())
+	}
+}

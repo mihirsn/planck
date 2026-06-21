@@ -307,3 +307,186 @@ notify:
 		}
 	})
 }
+
+func TestLoad_Resources_ValidFullBlock(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  interval: 30s
+  cpu:
+    threshold: 80
+  memory:
+    percent: 75
+    absolute: 1500
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Resources.IntervalDuration != 30*time.Second {
+		t.Errorf("expected resources interval 30s, got %v", cfg.Resources.IntervalDuration)
+	}
+	if cfg.Resources.CPU.Threshold != 80 {
+		t.Errorf("expected cpu.threshold=80, got %v", cfg.Resources.CPU.Threshold)
+	}
+	if cfg.Resources.Memory.Percent != 75 {
+		t.Errorf("expected memory.percent=75, got %v", cfg.Resources.Memory.Percent)
+	}
+	if cfg.Resources.Memory.Absolute != 1500 {
+		t.Errorf("expected memory.absolute=1500, got %v", cfg.Resources.Memory.Absolute)
+	}
+}
+
+func TestLoad_Resources_IntervalDefaultsToWatchInterval(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  interval: 45s
+
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  cpu:
+    threshold: 70
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	// resources.interval not set — should inherit watch.interval
+	if cfg.Resources.IntervalDuration != 45*time.Second {
+		t.Errorf("expected resources interval to default to 45s, got %v", cfg.Resources.IntervalDuration)
+	}
+}
+
+func TestLoad_Resources_EmptyBlockIsValid(t *testing.T) {
+	// An empty resources: block should be valid — no thresholds configured means no alerts.
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources: {}
+`)
+	_, err := config.Load(path)
+	if err != nil {
+		t.Errorf("expected no error for empty resources block, got %v", err)
+	}
+}
+
+func TestLoad_Resources_OmittedIsValid(t *testing.T) {
+	// Omitting resources entirely should be valid (no resource alerts).
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+`)
+	_, err := config.Load(path)
+	if err != nil {
+		t.Errorf("expected no error when resources is omitted, got %v", err)
+	}
+}
+
+func TestValidate_Resources_InvalidInterval(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  interval: not-a-duration
+`)
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for invalid resources.interval")
+	}
+}
+
+func TestValidate_Resources_CPUThresholdOutOfRange(t *testing.T) {
+	cases := []struct {
+		name      string
+		threshold string
+	}{
+		{"negative", "-1"},
+		{"over 100", "101"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  cpu:
+    threshold: `+tc.threshold+`
+`)
+			_, err := config.Load(path)
+			if err == nil {
+				t.Errorf("expected error for cpu.threshold=%s", tc.threshold)
+			}
+		})
+	}
+}
+
+func TestValidate_Resources_MemoryPercentOutOfRange(t *testing.T) {
+	cases := []struct {
+		name    string
+		percent string
+	}{
+		{"negative", "-1"},
+		{"over 100", "110"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  memory:
+    percent: `+tc.percent+`
+`)
+			_, err := config.Load(path)
+			if err == nil {
+				t.Errorf("expected error for memory.percent=%s", tc.percent)
+			}
+		})
+	}
+}
+
+func TestValidate_Resources_NegativeMemoryAbsolute(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  memory:
+    absolute: -500
+`)
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for negative memory.absolute")
+	}
+}
+
+func TestLoad_Resources_MemoryBothConditionsCoexist(t *testing.T) {
+	// Percent and absolute can both be set — either triggers an alert.
+	path := writeConfig(t, `
+notify:
+  ntfy_topic: my-topic
+
+resources:
+  memory:
+    percent: 80
+    absolute: 2048
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Resources.Memory.Percent != 80 {
+		t.Errorf("expected memory.percent=80, got %v", cfg.Resources.Memory.Percent)
+	}
+	if cfg.Resources.Memory.Absolute != 2048 {
+		t.Errorf("expected memory.absolute=2048, got %v", cfg.Resources.Memory.Absolute)
+	}
+}

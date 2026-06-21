@@ -11,16 +11,24 @@
 ```yaml
 watch:
   docker: my-api              # Docker container name or ID to watch
-  interval: 60s          # Poll every 60 seconds
-  alert_cooldown: 10m    # Don't repeat the same alert within 10 minutes
-  preset: fastapi        # Your log format preset
+  interval: 60s               # Poll logs every 60 seconds
+  alert_cooldown: 10m         # Don't repeat the same alert within 10 minutes
+  preset: fastapi             # Your log format preset
 
 alerts:
-  rps: 200               # Alert if requests per second exceeds 200
+  rps: 200                    # Alert if requests per second exceeds 200
   error_rate:
-    threshold: 10.0      # Alert if any endpoint exceeds 10% error rate
+    threshold: 10.0           # Alert if any endpoint exceeds 10% error rate
   p95_latency:
-    threshold: 2000      # Alert if any endpoint's p95 latency exceeds 2s
+    threshold: 2000           # Alert if any endpoint's p95 latency exceeds 2s
+
+resources:
+  interval: 30s               # Poll container stats every 30 seconds (independent of log interval)
+  cpu:
+    threshold: 80             # Alert if CPU usage >= 80%
+  memory:
+    percent: 75               # Alert if memory usage >= 75% of container limit
+    absolute: 1500            # Alert if memory usage >= 1500 MB (either condition triggers)
 
 notify:
   ntfy_topic: my-api-alerts        # Your ntfy topic name
@@ -60,11 +68,15 @@ Planck searches for `planck.yml` in this order:
 | `alerts.p95_latency.threshold` | float | — | Alert if any endpoint's p95 latency exceeds this ms |
 | `alerts.p95_latency.exclude_paths` | []string | — | Endpoints to ignore for latency alerts |
 | `alerts.p95_latency.include_paths` | []string | — | Restrict latency alerts to only these endpoints |
+| `resources.interval` | duration | `watch.interval` | How often to poll container stats (independent of log polling) |
+| `resources.cpu.threshold` | float | — | Alert if container CPU usage >= this percent (0–100) |
+| `resources.memory.percent` | float | — | Alert if memory usage >= this % of the container's memory limit |
+| `resources.memory.absolute` | float | — | Alert if memory usage >= this value in MB |
 | `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
 | `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
 | `notify.ntfy_token` | string | — | Bearer token for protected topics |
 
-> All `alerts` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
+> All `alerts` and `resources` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
 
 ## Endpoint Filtering
 
@@ -94,7 +106,82 @@ alerts:
 - If `include_paths` is provided, the endpoint **MUST** match at least one of them.
 - Filtering only suppresses alerts; the global Requests Per Second (RPS) calculation and terminal output remain accurate for all traffic.
 
-## Using a Custom Config Path
+---
+
+## Resource Alerts
+
+Planck can monitor your container's CPU and memory usage in real time, independently of log polling. Resource stats are collected via `docker stats --no-stream` — no agent, no SDK, zero extra dependencies.
+
+> Resource polling runs in a **separate goroutine** with its own interval. You can poll resources more frequently than logs (e.g. every 30s) without changing your log analysis cadence.
+
+### Threshold Behavior
+
+- **CPU threshold** — fires when `CPUPercent >= threshold`
+- **Memory percent** — fires when container memory usage >= this % of its configured limit
+- **Memory absolute** — fires when memory usage >= this value in MB
+- If **both** `memory.percent` and `memory.absolute` are set, each is evaluated independently with its own cooldown key — either condition can trigger an alert without affecting the other
+- All resource alerts respect the same `watch.alert_cooldown` as app-level alerts
+
+### Examples
+
+**CPU only:**
+```yaml
+resources:
+  interval: 30s
+  cpu:
+    threshold: 85   # Alert when container CPU >= 85%
+```
+
+**Memory only (both conditions):**
+```yaml
+resources:
+  memory:
+    percent: 80     # Alert when memory >= 80% of container limit
+    absolute: 3000  # OR when memory >= 3000 MB — whichever triggers first
+```
+
+**CPU + memory combined:**
+```yaml
+resources:
+  interval: 20s     # Poll stats every 20 seconds
+  cpu:
+    threshold: 75
+  memory:
+    percent: 70
+    absolute: 1500
+```
+
+**Omit `resources:` entirely** to disable all resource monitoring — zero behavior change from previous versions.
+
+### Alert Notification Format
+
+When a resource threshold is breached, Planck sends a notification via ntfy:
+
+```
+Title:  Planck – High CPU Usage
+Body:   **Container:** my-api
+        **CPU:** 87.3% (Threshold: 80%)
+
+Title:  Planck – High Memory Usage
+Body:   **Container:** my-api
+        **Memory:** 1600MB / 2048MB (78.1%) (Threshold: 75%)
+```
+
+The terminal also prints a heartbeat line on each resource poll:
+```
+[01:30:00] ✓ Resources — CPU: 12.3% | MEM: 512MB / 2048MB (25.0%)
+```
+
+### Memory & CPU Footprint
+
+Resource monitoring is designed to stay true to Planck's lightweight philosophy. Here's what it actually costs:
+
+- **Planck process RAM**: unchanged — the resource polling goroutine adds ~4 KB of stack, which is negligible. In practice, `planck watch` continues to run at ~7–10 MB RSS.
+- **Transient subprocess**: each poll spawns `docker stats --no-stream` as a **separate child process** (~1–2 MB), which exits in under a second. This memory belongs to the child process, not Planck, and the OS reclaims it immediately.
+- **CPU**: the resource goroutine sleeps between polls. It only wakes, runs a single CLI command, parses ~100 bytes of JSON, compares three floats, then sleeps again.
+
+> **Recommendation for low-resource machines (e.g. t2.micro / 1 GB RAM):** Use `interval: 30s` or longer. Polling every 5–10 seconds spawns a new `docker stats` subprocess that frequently — it works fine, but 30s is more than sufficient to catch sustained resource spikes and keeps overhead minimal.
+
 
 ```bash
 # Useful for managing multiple environments

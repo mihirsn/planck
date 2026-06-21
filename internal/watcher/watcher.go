@@ -20,6 +20,10 @@ import (
 // It is a field on Watcher to allow injection in tests.
 type SourceFunc func(container string, tail int, since string, until string) (source.LogSource, error)
 
+// StatsSourceFunc is a function that returns a new stats source for a given container.
+// It is a field on Watcher to allow injection in tests.
+type StatsSourceFunc func(container string) (source.StatsSource, error)
+
 // Watcher continuously polls a log source, evaluates thresholds, and fires alerts.
 type Watcher struct {
 	cfg       *config.Config
@@ -32,8 +36,10 @@ type Watcher struct {
 	mu        sync.Mutex
 	cooldowns map[string]time.Time
 
-	// NewSource is called on each poll cycle to create a fresh log source.
+	// NewSource is called on each log poll cycle to create a fresh log source.
 	NewSource SourceFunc
+	// NewStatsSource is called on each resource poll cycle to create a fresh stats source.
+	NewStatsSource StatsSourceFunc
 }
 
 // New creates a ready-to-run Watcher.
@@ -48,6 +54,9 @@ func New(cfg *config.Config, container string, fieldMap models.FieldMap, out io.
 		NewSource: func(container string, tail int, since string, until string) (source.LogSource, error) {
 			return source.NewDockerSource(container, tail, since, until)
 		},
+		NewStatsSource: func(container string) (source.StatsSource, error) {
+			return source.NewDockerStatsSource(container)
+		},
 	}
 }
 
@@ -59,20 +68,42 @@ func (w *Watcher) Run(stop <-chan struct{}) {
 	} else {
 		fmt.Fprintln(w.out, "   Alerts: none configured (add thresholds to planck.yml)")
 	}
+	if summary := formatResourceAlerts(w.cfg.Resources); summary != "" {
+		fmt.Fprintf(w.out, "   Resources: %s (interval: %s)\n", summary, w.cfg.Resources.IntervalDuration)
+	}
 	fmt.Fprintln(w.out)
 
-	ticker := time.NewTicker(w.cfg.Watch.IntervalDuration)
-	defer ticker.Stop()
+	// --- Log polling ticker ---
+	logTicker := time.NewTicker(w.cfg.Watch.IntervalDuration)
+	defer logTicker.Stop()
 
-	// Run an immediate first poll, then tick.
+	// Run an immediate first log poll, then tick.
 	w.poll()
+
+	// --- Resource polling goroutine (runs independently if any resource threshold is set) ---
+	if w.hasResourceAlerts() {
+		go func() {
+			resTicker := time.NewTicker(w.cfg.Resources.IntervalDuration)
+			defer resTicker.Stop()
+			// Run an immediate first resource poll, then tick.
+			w.pollResources()
+			for {
+				select {
+				case <-stop:
+					return
+				case <-resTicker.C:
+					w.pollResources()
+				}
+			}
+		}()
+	}
 
 	for {
 		select {
 		case <-stop:
 			fmt.Fprintln(w.out, "\n> Planck watch stopped.")
 			return
-		case <-ticker.C:
+		case <-logTicker.C:
 			w.poll()
 		}
 	}
@@ -118,6 +149,32 @@ func (w *Watcher) poll() {
 		timestamp(), report.TotalRequests, report.AvgRPS)
 
 	w.evaluate(report)
+}
+
+// pollResources fetches a single container stats snapshot and evaluates resource thresholds.
+func (w *Watcher) pollResources() {
+	statsSrc, err := w.NewStatsSource(w.container)
+	if err != nil {
+		fmt.Fprintf(w.out, "[%s] ⚠  Failed to open stats source: %v\n", timestamp(), err)
+		return
+	}
+
+	stats, err := statsSrc.Collect()
+	if err != nil {
+		fmt.Fprintf(w.out, "[%s] ⚠  Failed to collect container stats: %v\n", timestamp(), err)
+		return
+	}
+
+	fmt.Fprintf(w.out, "[%s] ✓ Resources — CPU: %.1f%% | MEM: %.0fMB / %.0fMB (%.1f%%)\n",
+		timestamp(), stats.CPUPercent, stats.MemUsedMB, stats.MemLimitMB, stats.MemPercent)
+
+	w.evaluateResources(stats)
+}
+
+// hasResourceAlerts reports whether any resource threshold is configured.
+func (w *Watcher) hasResourceAlerts() bool {
+	r := w.cfg.Resources
+	return r.CPU.Threshold > 0 || r.Memory.Percent > 0 || r.Memory.Absolute > 0
 }
 
 // shouldAlertOnPath determines if an endpoint should trigger an alert based on include/exclude paths.
@@ -184,6 +241,42 @@ func (w *Watcher) evaluate(report metrics.Report) {
 	}
 }
 
+// evaluateResources checks container stats against configured resource thresholds
+// and fires alerts as needed. Strategy: instant breach with cooldown (v1).
+func (w *Watcher) evaluateResources(stats source.ContainerStats) {
+	res := w.cfg.Resources
+
+	// CPU threshold
+	if res.CPU.Threshold > 0 && stats.CPUPercent >= res.CPU.Threshold {
+		w.maybeAlert(
+			"resource:cpu",
+			"Planck – High CPU Usage",
+			fmt.Sprintf("**Container:** %s\n**CPU:** %.1f%% (Threshold: %.0f%%)",
+				w.container, stats.CPUPercent, res.CPU.Threshold),
+		)
+	}
+
+	// Memory percent threshold
+	if res.Memory.Percent > 0 && stats.MemPercent >= res.Memory.Percent {
+		w.maybeAlert(
+			"resource:memory:percent",
+			"Planck – High Memory Usage",
+			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (%.1f%%) (Threshold: %.0f%%)",
+				w.container, stats.MemUsedMB, stats.MemLimitMB, stats.MemPercent, res.Memory.Percent),
+		)
+	}
+
+	// Memory absolute threshold (MB)
+	if res.Memory.Absolute > 0 && stats.MemUsedMB >= res.Memory.Absolute {
+		w.maybeAlert(
+			"resource:memory:absolute",
+			"Planck – High Memory Usage",
+			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (Threshold: %.0fMB)",
+				w.container, stats.MemUsedMB, stats.MemLimitMB, res.Memory.Absolute),
+		)
+	}
+}
+
 // maybeAlert sends a notification only if the cooldown for the given key has expired.
 func (w *Watcher) maybeAlert(key, title, message string) {
 	w.mu.Lock()
@@ -230,6 +323,22 @@ func formatAlerts(a config.AlertConfig) string {
 	}
 	if a.RPS > 0 {
 		parts = append(parts, fmt.Sprintf("rps≥%.0f", a.RPS))
+	}
+	return strings.Join(parts, " | ")
+}
+
+// formatResourceAlerts builds a concise summary of configured resource thresholds.
+// Returns an empty string if no resource thresholds are set.
+func formatResourceAlerts(r config.ResourcesConfig) string {
+	var parts []string
+	if r.CPU.Threshold > 0 {
+		parts = append(parts, fmt.Sprintf("cpu≥%.0f%%", r.CPU.Threshold))
+	}
+	if r.Memory.Percent > 0 {
+		parts = append(parts, fmt.Sprintf("mem≥%.0f%%", r.Memory.Percent))
+	}
+	if r.Memory.Absolute > 0 {
+		parts = append(parts, fmt.Sprintf("mem≥%.0fMB", r.Memory.Absolute))
 	}
 	return strings.Join(parts, " | ")
 }
