@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     name: Build, Test & Lint
@@ -32,16 +35,14 @@ jobs:
       - name: Run tests with coverage (internal packages only)
         run: go test ./internal/... -coverprofile=coverage.out -covermode=atomic -v
 
-      - name: Check coverage threshold (90%) — internal packages
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{gsub(/%/, "", $3); print int($3)}')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "${COVERAGE}" -lt "90" ]; then
-            echo "❌ Coverage ${COVERAGE}% is below the required 90%"
-            exit 1
-          else
-            echo "✅ Coverage ${COVERAGE}% meets the 90% threshold"
-          fi
+      - name: Check test coverage and generate badge
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: coverage.out
+          local-prefix: github.com/mihirsn/planck
+          threshold-total: 90
+          git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges
 
       - name: Upload coverage to artifact
         uses: actions/upload-artifact@v4
