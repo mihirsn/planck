@@ -30,3 +30,6 @@ coverage.html
 # goreleaser
 dist/
 logo.png
+
+# Configuration examples / local
+planck.yml
