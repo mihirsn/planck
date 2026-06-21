@@ -9,6 +9,9 @@
   <a href="https://github.com/mihirsn/planck/actions/workflows/ci.yml">
     <img src="https://github.com/mihirsn/planck/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
+  <a href="https://github.com/mihirsn/planck/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/badge/coverage-90%25%2B-brightgreen.svg" alt="Coverage: 90%+">
+  </a>
   <a href="https://github.com/mihirsn/planck/releases/latest">
     <img src="https://img.shields.io/github/v/release/mihirsn/planck" alt="Latest Release">
   </a>
@@ -18,16 +21,7 @@
   <a href="https://go.dev/">
     <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go" alt="Go Version">
   </a>
-  <img src="https://img.shields.io/badge/status-early%20alpha-orange" alt="Status: Early Alpha">
 </p>
-
----
-
-> Planck is in active early development. The log format, CLI flags, and JSON output schema **may change between versions** without a deprecation period.
->
-> **Platform testing**: Manually tested and verified on **macOS arm64** only. Unit tests pass on Linux (ubuntu-latest) via CI. Binaries for Linux and Windows are built via goreleaser but have not yet been manually verified. If you try Planck on Linux or Windows and run into issues, please [open a bug report](https://github.com/mihirsn/planck/issues/new?template=bug_report.md) — your feedback helps.
->
-> Feedback, bug reports, and ideas are very welcome.
 
 ---
 
