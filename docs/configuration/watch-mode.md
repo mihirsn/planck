@@ -31,9 +31,15 @@ resources:
     absolute: 1500            # Alert if memory usage >= 1500 MB (either condition triggers)
 
 notify:
-  ntfy_topic: my-api-alerts        # Your ntfy topic name
-  ntfy_server: https://ntfy.sh     # Or your self-hosted ntfy URL
-  ntfy_token: ""                   # Optional: for protected topics
+  # At least one destination (ntfy or webhook) is required
+  ntfy:
+    topic: my-api-alerts           # Your ntfy topic name
+    server: https://ntfy.sh        # Or your self-hosted ntfy URL
+    token: ""                      # Optional: for protected topics
+  webhook:
+    url: https://alerts.mycompany.com/planck
+    headers:                       # Optional: Supports env var expansion
+      Authorization: Bearer ${API_KEY}
 ```
 
 **2. Subscribe to your ntfy topic** on your phone or desktop at `ntfy.sh/my-api-alerts`.
@@ -72,9 +78,11 @@ Planck searches for `planck.yml` in this order:
 | `resources.cpu.threshold` | float | — | Alert if container CPU usage >= this percent (0–100) |
 | `resources.memory.percent` | float | — | Alert if memory usage >= this % of the container's memory limit |
 | `resources.memory.absolute` | float | — | Alert if memory usage >= this value in MB |
-| `notify.ntfy_topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
-| `notify.ntfy_server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
-| `notify.ntfy_token` | string | — | Bearer token for protected topics |
+| `notify.ntfy.topic` | string | **required** | Your ntfy topic name (letters, digits, `-`, `_` only) |
+| `notify.ntfy.server` | string | `https://ntfy.sh` | ntfy server URL (must be http/https) |
+| `notify.ntfy.token` | string | — | Bearer token for protected topics |
+| `notify.webhook.url` | string | **required** | Your webhook destination URL |
+| `notify.webhook.headers` | map | — | Optional HTTP headers (supports `${ENV_VAR}` expansion) |
 
 > All `alerts` and `resources` fields are optional. Planck only checks thresholds you configure — omitted fields are never alerted on.
 
@@ -190,14 +198,28 @@ planck watch --docker my-api --config /etc/planck/planck-prod.yml
 
 ## Self-Hosted ntfy
 
-[ntfy](https://ntfy.sh/) can be self-hosted on your own server. Simply point `ntfy_server` at your instance:
+[ntfy](https://ntfy.sh/) can be self-hosted on your own server. Simply point `server` at your instance:
 
 ```yaml
 notify:
-  ntfy_topic: my-alerts
-  ntfy_server: https://ntfy.yourdomain.com
-  ntfy_token: your-access-token
+  ntfy:
+    topic: my-alerts
+    server: https://ntfy.yourdomain.com
+    token: your-access-token
 ```
+
+## Webhook Notifications
+
+Planck can also send a structured JSON `POST` request directly to any webhook endpoint whenever an alert fires.
+
+```yaml
+notify:
+  webhook:
+    url: https://api.pagerduty.com/alerts
+    headers:
+      Authorization: Bearer ${PAGERDUTY_TOKEN}
+```
+*Note: Planck automatically expands any environment variables in the headers block, preventing you from committing secrets to your repository.*
 
 ## Running in Production
 
