@@ -86,14 +86,28 @@ type MemThreshold struct {
 	Absolute float64 `yaml:"absolute"`
 }
 
-// NotifyConfig holds ntfy connection details.
+// NotifyConfig holds notification destination settings.
 type NotifyConfig struct {
-	// NtfyTopic is the ntfy topic name (required).
-	NtfyTopic string `yaml:"ntfy_topic"`
-	// NtfyServer is the ntfy server URL. Defaults to https://ntfy.sh.
-	NtfyServer string `yaml:"ntfy_server"`
-	// NtfyToken is an optional bearer token for protected topics. Never logged.
-	NtfyToken string `yaml:"ntfy_token"`
+	Ntfy    *NtfyConfig    `yaml:"ntfy,omitempty"`
+	Webhook *WebhookConfig `yaml:"webhook,omitempty"`
+}
+
+// NtfyConfig holds ntfy connection details.
+type NtfyConfig struct {
+	// Topic is the ntfy topic name (required).
+	Topic string `yaml:"topic"`
+	// Server is the ntfy server URL. Defaults to https://ntfy.sh.
+	Server string `yaml:"server"`
+	// Token is an optional bearer token for protected topics. Never logged.
+	Token string `yaml:"token"`
+}
+
+// WebhookConfig holds webhook connection details.
+type WebhookConfig struct {
+	// URL is the destination HTTP endpoint (required).
+	URL string `yaml:"url"`
+	// Headers is a map of optional HTTP headers. Supports environment variable expansion.
+	Headers map[string]string `yaml:"headers,omitempty"`
 }
 
 // DefaultConfigPaths defines where Planck looks for planck.yml, in order.
@@ -193,21 +207,39 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("resources.memory.absolute must be >= 0, got %.2f", c.Resources.Memory.Absolute)
 	}
 
-	// --- notify.ntfy_topic ---
-	if c.Notify.NtfyTopic == "" {
-		return fmt.Errorf("notify.ntfy_topic is required")
-	}
-	if !validTopicRe.MatchString(c.Notify.NtfyTopic) {
-		return fmt.Errorf("notify.ntfy_topic %q contains invalid characters: only letters, digits, hyphens, and underscores are allowed", c.Notify.NtfyTopic)
+	// --- notify ---
+	if c.Notify.Ntfy == nil && c.Notify.Webhook == nil {
+		return fmt.Errorf("notify requires at least one destination (ntfy or webhook)")
 	}
 
-	// --- notify.ntfy_server ---
-	if c.Notify.NtfyServer == "" {
-		c.Notify.NtfyServer = "https://ntfy.sh"
+	if c.Notify.Ntfy != nil {
+		if c.Notify.Ntfy.Topic == "" {
+			return fmt.Errorf("notify.ntfy.topic is required")
+		}
+		if !validTopicRe.MatchString(c.Notify.Ntfy.Topic) {
+			return fmt.Errorf("notify.ntfy.topic %q contains invalid characters: only letters, digits, hyphens, and underscores are allowed", c.Notify.Ntfy.Topic)
+		}
+		if c.Notify.Ntfy.Server == "" {
+			c.Notify.Ntfy.Server = "https://ntfy.sh"
+		}
+		u, err := url.ParseRequestURI(c.Notify.Ntfy.Server)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			return fmt.Errorf("notify.ntfy.server %q must be a valid http:// or https:// URL", c.Notify.Ntfy.Server)
+		}
 	}
-	u, err := url.ParseRequestURI(c.Notify.NtfyServer)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return fmt.Errorf("notify.ntfy_server %q must be a valid http:// or https:// URL", c.Notify.NtfyServer)
+
+	if c.Notify.Webhook != nil {
+		if c.Notify.Webhook.URL == "" {
+			return fmt.Errorf("notify.webhook.url is required")
+		}
+		u, err := url.ParseRequestURI(c.Notify.Webhook.URL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			return fmt.Errorf("notify.webhook.url %q must be a valid http:// or https:// URL", c.Notify.Webhook.URL)
+		}
+		// Expand environment variables in headers (e.g. ${API_KEY})
+		for k, v := range c.Notify.Webhook.Headers {
+			c.Notify.Webhook.Headers[k] = os.ExpandEnv(v)
+		}
 	}
 
 	return nil

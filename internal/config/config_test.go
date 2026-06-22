@@ -35,9 +35,10 @@ alerts:
   rps: 50
 
 notify:
-  ntfy_topic: my-alerts
-  ntfy_server: https://ntfy.sh
-  ntfy_token: secret
+  ntfy:
+    topic: my-alerts
+    server: https://ntfy.sh
+    token: secret
 `)
 	cfg, err := config.Load(path)
 	if err != nil {
@@ -52,8 +53,8 @@ notify:
 	if cfg.Alerts.ErrorRate.Threshold != 5.0 {
 		t.Errorf("expected error_rate.threshold=5.0, got %v", cfg.Alerts.ErrorRate.Threshold)
 	}
-	if cfg.Notify.NtfyTopic != "my-alerts" {
-		t.Errorf("expected topic=my-alerts, got %q", cfg.Notify.NtfyTopic)
+	if cfg.Notify.Ntfy.Topic != "my-alerts" {
+		t.Errorf("expected topic=my-alerts, got %q", cfg.Notify.Ntfy.Topic)
 	}
 }
 
@@ -61,7 +62,8 @@ func TestLoad_Defaults(t *testing.T) {
 	// Omit interval, cooldown, server — they should all default.
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	cfg, err := config.Load(path)
 	if err != nil {
@@ -73,8 +75,8 @@ notify:
 	if cfg.Watch.CooldownDuration != 10*time.Minute {
 		t.Errorf("expected default cooldown 10m, got %v", cfg.Watch.CooldownDuration)
 	}
-	if cfg.Notify.NtfyServer != "https://ntfy.sh" {
-		t.Errorf("expected default server https://ntfy.sh, got %q", cfg.Notify.NtfyServer)
+	if cfg.Notify.Ntfy.Server != "https://ntfy.sh" {
+		t.Errorf("expected default server https://ntfy.sh, got %q", cfg.Notify.Ntfy.Server)
 	}
 }
 
@@ -96,7 +98,8 @@ func TestLoad_InvalidYAML(t *testing.T) {
 func TestLoad_UnknownField(t *testing.T) {
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
   unknown_field: bad
 `)
 	_, err := config.Load(path)
@@ -110,7 +113,8 @@ func TestValidate_InvalidInterval(t *testing.T) {
 watch:
   interval: not-a-duration
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -123,7 +127,8 @@ func TestValidate_ZeroInterval(t *testing.T) {
 watch:
   interval: 0s
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -136,7 +141,8 @@ func TestValidate_InvalidCooldown(t *testing.T) {
 watch:
   alert_cooldown: bad
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -150,7 +156,8 @@ alerts:
   error_rate:
     threshold: 150.0
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -164,7 +171,8 @@ alerts:
   p95_latency:
     threshold: -1
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -177,7 +185,8 @@ func TestValidate_NegativeRPS(t *testing.T) {
 alerts:
   rps: -5
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -188,7 +197,7 @@ notify:
 func TestValidate_MissingTopic(t *testing.T) {
 	path := writeConfig(t, `
 notify:
-  ntfy_server: https://ntfy.sh
+    server: https://ntfy.sh
 `)
 	_, err := config.Load(path)
 	if err == nil {
@@ -205,7 +214,7 @@ func TestValidate_InvalidTopicChars(t *testing.T) {
 	}
 	for _, topic := range cases {
 		t.Run(topic, func(t *testing.T) {
-			path := writeConfig(t, "notify:\n  ntfy_topic: \""+topic+"\"\n")
+			path := writeConfig(t, "notify:\n  ntfy:\n    topic: \""+topic+"\"\n")
 			_, err := config.Load(path)
 			if err == nil {
 				t.Errorf("expected error for invalid topic %q", topic)
@@ -218,7 +227,7 @@ func TestValidate_ValidTopicChars(t *testing.T) {
 	cases := []string{"my-topic", "my_topic", "MyTopic123", "a"}
 	for _, topic := range cases {
 		t.Run(topic, func(t *testing.T) {
-			path := writeConfig(t, "notify:\n  ntfy_topic: \""+topic+"\"\n")
+			path := writeConfig(t, "notify:\n  ntfy:\n    topic: \""+topic+"\"\n")
 			_, err := config.Load(path)
 			if err != nil {
 				t.Errorf("expected no error for valid topic %q, got %v", topic, err)
@@ -235,7 +244,7 @@ func TestValidate_InvalidServer(t *testing.T) {
 	}
 	for _, server := range cases {
 		t.Run(server, func(t *testing.T) {
-			path := writeConfig(t, "notify:\n  ntfy_topic: my-topic\n  ntfy_server: \""+server+"\"\n")
+			path := writeConfig(t, "notify:\n  ntfy:\n    topic: my-topic\n    server: \""+server+"\"\n")
 			_, err := config.Load(path)
 			if err == nil {
 				t.Errorf("expected error for invalid server %q", server)
@@ -264,7 +273,7 @@ func TestDiscover_CurrentDir(t *testing.T) {
 	defer os.Chdir(orig)
 
 	// Create a planck.yml in the current dir.
-	os.WriteFile(filepath.Join(dir, "planck.yml"), []byte("notify:\n  ntfy_topic: test\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "planck.yml"), []byte("notify:\n  ntfy:\n    topic: test\n"), 0644)
 
 	found := config.Discover()
 	if found != "planck.yml" {
@@ -281,7 +290,8 @@ func TestLoad_WatchDocker(t *testing.T) {
 watch:
   docker: my-api
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 		cfg, err := config.Load(path)
 		if err != nil {
@@ -296,7 +306,8 @@ notify:
 		t.Parallel()
 		path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 		cfg, err := config.Load(path)
 		if err != nil {
@@ -311,7 +322,8 @@ notify:
 func TestLoad_Resources_ValidFullBlock(t *testing.T) {
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   interval: 30s
@@ -345,7 +357,8 @@ watch:
   interval: 45s
 
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   cpu:
@@ -365,7 +378,8 @@ func TestLoad_Resources_EmptyBlockIsValid(t *testing.T) {
 	// An empty resources: block should be valid — no thresholds configured means no alerts.
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources: {}
 `)
@@ -379,7 +393,8 @@ func TestLoad_Resources_OmittedIsValid(t *testing.T) {
 	// Omitting resources entirely should be valid (no resource alerts).
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 `)
 	_, err := config.Load(path)
 	if err != nil {
@@ -390,7 +405,8 @@ notify:
 func TestValidate_Resources_InvalidInterval(t *testing.T) {
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   interval: not-a-duration
@@ -413,7 +429,8 @@ func TestValidate_Resources_CPUThresholdOutOfRange(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   cpu:
@@ -439,7 +456,8 @@ func TestValidate_Resources_MemoryPercentOutOfRange(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   memory:
@@ -456,7 +474,8 @@ resources:
 func TestValidate_Resources_NegativeMemoryAbsolute(t *testing.T) {
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   memory:
@@ -472,7 +491,8 @@ func TestLoad_Resources_MemoryBothConditionsCoexist(t *testing.T) {
 	// Percent and absolute can both be set — either triggers an alert.
 	path := writeConfig(t, `
 notify:
-  ntfy_topic: my-topic
+  ntfy:
+    topic: my-topic
 
 resources:
   memory:
