@@ -48,7 +48,7 @@ func New(cfg *config.Config, container string, fieldMap models.FieldMap, out io.
 		cfg:       cfg,
 		container: container,
 		fieldMap:  fieldMap,
-		notifier:  notify.NewClient(cfg.Notify.NtfyServer, cfg.Notify.NtfyTopic, cfg.Notify.NtfyToken),
+		notifier:  notify.NewClient(cfg.Notify, out),
 		out:       out,
 		cooldowns: make(map[string]time.Time),
 		NewSource: func(container string, tail int, since string, until string) (source.LogSource, error) {
@@ -208,8 +208,16 @@ func (w *Watcher) evaluate(report metrics.Report) {
 	if cfg.RPS > 0 && report.AvgRPS >= cfg.RPS {
 		w.maybeAlert(
 			"global:rps",
-			"Planck - High Traffic",
-			fmt.Sprintf("**Container:** %s\n**RPS:** %.2f (Threshold: %.0f)", w.container, report.AvgRPS, cfg.RPS),
+			notify.AlertPayload{
+				Container: w.container,
+				Type:      "rps",
+				Title:     "Planck - High Traffic",
+				Value:     report.AvgRPS,
+				Threshold: cfg.RPS,
+				Unit:      "req/s",
+				Message:   fmt.Sprintf("**Container:** %s\n**RPS:** %.2f (Threshold: %.0f)", w.container, report.AvgRPS, cfg.RPS),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			},
 		)
 	}
 
@@ -221,8 +229,17 @@ func (w *Watcher) evaluate(report metrics.Report) {
 		if cfg.ErrorRate.Threshold > 0 && ep.ErrorRate >= cfg.ErrorRate.Threshold {
 			w.maybeAlert(
 				fmt.Sprintf("endpoint:error:%s", ep.Path),
-				"Planck: High Error Rate",
-				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)", w.container, ep.Path, ep.ErrorRate, cfg.ErrorRate.Threshold),
+				notify.AlertPayload{
+					Container: w.container,
+					Type:      "error_rate",
+					Title:     "Planck: High Error Rate",
+					Endpoint:  ep.Path,
+					Value:     ep.ErrorRate,
+					Threshold: cfg.ErrorRate.Threshold,
+					Unit:      "%",
+					Message:   fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**Rate:** %.1f%% (Threshold: %.0f%%)", w.container, ep.Path, ep.ErrorRate, cfg.ErrorRate.Threshold),
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+				},
 			)
 		}
 	}
@@ -234,8 +251,17 @@ func (w *Watcher) evaluate(report metrics.Report) {
 		if cfg.P95Latency.Threshold > 0 && float64(ep.P95LatencyMs) >= cfg.P95Latency.Threshold {
 			w.maybeAlert(
 				fmt.Sprintf("endpoint:latency:%s", ep.Path),
-				"Planck: High Latency",
-				fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)", w.container, ep.Path, ep.P95LatencyMs, cfg.P95Latency.Threshold),
+				notify.AlertPayload{
+					Container: w.container,
+					Type:      "p95_latency",
+					Title:     "Planck: High Latency",
+					Endpoint:  ep.Path,
+					Value:     float64(ep.P95LatencyMs),
+					Threshold: cfg.P95Latency.Threshold,
+					Unit:      "ms",
+					Message:   fmt.Sprintf("**Container:** %s\n**Endpoint:** %s\n**P95 Latency:** %.0fms (Threshold: %.0fms)", w.container, ep.Path, ep.P95LatencyMs, cfg.P95Latency.Threshold),
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+				},
 			)
 		}
 	}
@@ -250,9 +276,16 @@ func (w *Watcher) evaluateResources(stats source.ContainerStats) {
 	if res.CPU.Threshold > 0 && stats.CPUPercent >= res.CPU.Threshold {
 		w.maybeAlert(
 			"resource:cpu",
-			"Planck – High CPU Usage",
-			fmt.Sprintf("**Container:** %s\n**CPU:** %.1f%% (Threshold: %.0f%%)",
-				w.container, stats.CPUPercent, res.CPU.Threshold),
+			notify.AlertPayload{
+				Container: w.container,
+				Type:      "cpu",
+				Title:     "Planck – High CPU Usage",
+				Value:     stats.CPUPercent,
+				Threshold: res.CPU.Threshold,
+				Unit:      "%",
+				Message:   fmt.Sprintf("**Container:** %s\n**CPU:** %.1f%% (Threshold: %.0f%%)", w.container, stats.CPUPercent, res.CPU.Threshold),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			},
 		)
 	}
 
@@ -260,9 +293,16 @@ func (w *Watcher) evaluateResources(stats source.ContainerStats) {
 	if res.Memory.Percent > 0 && stats.MemPercent >= res.Memory.Percent {
 		w.maybeAlert(
 			"resource:memory:percent",
-			"Planck – High Memory Usage",
-			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (%.1f%%) (Threshold: %.0f%%)",
-				w.container, stats.MemUsedMB, stats.MemLimitMB, stats.MemPercent, res.Memory.Percent),
+			notify.AlertPayload{
+				Container: w.container,
+				Type:      "memory",
+				Title:     "Planck – High Memory Usage",
+				Value:     stats.MemPercent,
+				Threshold: res.Memory.Percent,
+				Unit:      "%",
+				Message:   fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (%.1f%%) (Threshold: %.0f%%)", w.container, stats.MemUsedMB, stats.MemLimitMB, stats.MemPercent, res.Memory.Percent),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			},
 		)
 	}
 
@@ -270,15 +310,22 @@ func (w *Watcher) evaluateResources(stats source.ContainerStats) {
 	if res.Memory.Absolute > 0 && stats.MemUsedMB >= res.Memory.Absolute {
 		w.maybeAlert(
 			"resource:memory:absolute",
-			"Planck – High Memory Usage",
-			fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (Threshold: %.0fMB)",
-				w.container, stats.MemUsedMB, stats.MemLimitMB, res.Memory.Absolute),
+			notify.AlertPayload{
+				Container: w.container,
+				Type:      "memory",
+				Title:     "Planck – High Memory Usage",
+				Value:     stats.MemUsedMB,
+				Threshold: res.Memory.Absolute,
+				Unit:      "MB",
+				Message:   fmt.Sprintf("**Container:** %s\n**Memory:** %.0fMB / %.0fMB (Threshold: %.0fMB)", w.container, stats.MemUsedMB, stats.MemLimitMB, res.Memory.Absolute),
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			},
 		)
 	}
 }
 
 // maybeAlert sends a notification only if the cooldown for the given key has expired.
-func (w *Watcher) maybeAlert(key, title, message string) {
+func (w *Watcher) maybeAlert(key string, payload notify.AlertPayload) {
 	w.mu.Lock()
 	last, exists := w.cooldowns[key]
 	w.mu.Unlock()
@@ -287,18 +334,15 @@ func (w *Watcher) maybeAlert(key, title, message string) {
 		return // still within cooldown window, skip
 	}
 
-	err := w.notifier.Send(title, message)
-	if err != nil {
-		fmt.Fprintf(w.out, "     ⚠  Failed to send alert: %v\n", err)
-		return
-	}
+	// Dispatch notification (non-blocking)
+	w.notifier.Send(payload)
 
 	w.mu.Lock()
 	w.cooldowns[key] = time.Now()
 	w.mu.Unlock()
 
 	// Print the alert with blank line separators so it stands out from heartbeat lines.
-	fmt.Fprintf(w.out, "\n   🚨 Alert sent: %s\n\n", strings.SplitN(message, "\n", 2)[0])
+	fmt.Fprintf(w.out, "\n   🚨 Alert sent: %s\n\n", strings.SplitN(payload.Message, "\n", 2)[0])
 }
 
 // durationToSince converts a time.Duration to the --since string format Planck uses.

@@ -84,7 +84,7 @@ planck analyze --docker my-api
 ```
 
 ### 2. Watch Mode (Continuous monitoring)
-Continuously monitor a Docker container's logs and send real-time push notifications via [ntfy.sh](https://ntfy.sh) when things go wrong.
+Continuously monitor a Docker container's logs and send real-time push notifications via [ntfy](https://ntfy.sh) or webhooks when things go wrong.
 
 ```bash
 planck watch --docker my-api

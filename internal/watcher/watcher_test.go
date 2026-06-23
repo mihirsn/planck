@@ -49,9 +49,11 @@ func makeConfig(t *testing.T, ntfyURL string, opts ...func(*config.Config)) *con
 			RPS: 1000.0,
 		},
 		Notify: config.NotifyConfig{
-			NtfyTopic:  "test-topic",
-			NtfyServer: ntfyURL,
-			NtfyToken:  "",
+			Ntfy: &config.NtfyConfig{
+				Topic:  "test-topic",
+				Server: ntfyURL,
+				Token:  "",
+			},
 		},
 	}
 	for _, opt := range opts {
