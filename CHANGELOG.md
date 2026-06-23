@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-06-23
+
+### Added
+- **Webhook Notifications** — `planck watch` can now dispatch alerts to any webhook destination using a fully structured JSON payload.
+  - Supports nested `notify.ntfy` and `notify.webhook` configuration blocks.
+  - Webhook headers natively support environment variable expansion (e.g. `Authorization: Bearer ${API_KEY}`).
+  - Both ntfy and webhooks are dispatched asynchronously via lightweight "send and forget" goroutines to ensure the log polling loop is never blocked.
+
+---
+
 ## [0.3.0] - 2026-06-21
 
 ### Added
@@ -163,7 +173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/mihirsn/planck/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mihirsn/planck/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mihirsn/planck/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mihirsn/planck/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/mihirsn/planck/compare/v0.2.5...v0.2.7
 [0.2.5]: https://github.com/mihirsn/planck/compare/v0.2.4...v0.2.5
