@@ -6,27 +6,26 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mihirsn/planck/internal/config"
-	"github.com/mihirsn/planck/internal/models"
-	"github.com/mihirsn/planck/internal/watcher"
 	"github.com/spf13/cobra"
+
+	"github.com/mihirsn/planck/internal/config"
+	"github.com/mihirsn/planck/internal/watcher"
 )
 
 // watchFlags holds the CLI flags for the watch command.
-// Deliberately minimal — all alert thresholds live in planck.yml.
+// Deliberately minimal — all container config and alert thresholds live in planck.yml.
 var watchFlags struct {
-	docker     string
 	configPath string
 }
 
 // watchCmd is the `planck watch` command.
 var watchCmd = &cobra.Command{
 	Use:   "watch",
-	Short: "Continuously monitor a Docker container and alert on threshold breaches",
+	Short: "Continuously monitor Docker containers and alert on threshold breaches",
 	Long: `> Planck Watch — Continuous monitoring with real-time alerting.
 
-Planck watch polls a Docker container's logs on a configurable interval,
-evaluates your alert thresholds, and sends notifications via ntfy when
+Planck watch polls one or more Docker containers' logs on a configurable interval,
+evaluates your alert thresholds, and sends notifications via ntfy or webhook when
 a threshold is breached.
 
 All configuration lives in planck.yml. Planck searches for it in:
@@ -35,7 +34,7 @@ All configuration lives in planck.yml. Planck searches for it in:
   3. Your home directory (~/.planck.yml)
   4. Global config (/etc/planck/planck.yml)
 
-Example planck.yml:
+Single-container example (planck.yml):
 
   watch:
     docker: my-api
@@ -44,24 +43,45 @@ Example planck.yml:
     preset: fastapi
 
   alerts:
-    error_rate_pct: 10.0
-    p95_latency_ms: 2000
-    rps: 100
+    error_rate:
+      threshold: 10.0
+    p95_latency:
+      threshold: 2000
 
   notify:
-    ntfy_topic: my-api-alerts
-    ntfy_server: https://ntfy.sh
+    ntfy:
+      topic: my-api-alerts
+
+Multi-container example (planck.yml):
+
+  watch:
+    interval: 60s
+    preset: fastapi          # global default
+
+  alerts:
+    error_rate:
+      threshold: 10.0        # global default
+
+  notify:
+    ntfy:
+      topic: my-alerts
+
+  containers:
+    - name: my-api           # inherits all global defaults
+    - name: my-worker
+      preset: express        # override preset for this container
+      alerts:
+        error_rate:
+          threshold: 5.0     # stricter threshold for this container
 
 Usage:
-  planck watch                              # container name from planck.yml
-  planck watch --docker my-api             # override container via flag
+  planck watch                              # reads containers from planck.yml
   planck watch --config /etc/planck/planck.yml`,
 
 	RunE: runWatch,
 }
 
 func init() {
-	watchCmd.Flags().StringVar(&watchFlags.docker, "docker", "", "Docker container name or ID to watch (overrides planck.yml)")
 	watchCmd.Flags().StringVar(&watchFlags.configPath, "config", "", "Path to planck.yml (default: auto-discover)")
 	rootCmd.AddCommand(watchCmd)
 }
@@ -85,23 +105,10 @@ func runWatch(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// --- Build field map from preset ---
-	var fieldMap models.FieldMap
-	if cfg.Watch.Preset != "" {
-		fm, err := models.PresetFieldMap(cfg.Watch.Preset)
-		if err != nil {
-			return fmt.Errorf("invalid preset %q in planck.yml: %w", cfg.Watch.Preset, err)
-		}
-		fieldMap = fm
-	} else {
-		// Default field map (standard JSON keys)
-		fieldMap = models.FieldMap{
-			Timestamp: "timestamp",
-			Method:    "method",
-			Path:      "path",
-			Status:    "status",
-			LatencyMs: "latency_ms",
-		}
+	// --- Resolve the container list (handles auto-promote and per-container merging) ---
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		return err
 	}
 
 	// --- Set up graceful shutdown on Ctrl+C / SIGTERM ---
@@ -113,22 +120,8 @@ func runWatch(cmd *cobra.Command, _ []string) error {
 		close(stop)
 	}()
 
-	// --- Resolve Docker container name (flag takes priority over planck.yml) ---
-	container := watchFlags.docker
-	if container == "" {
-		container = cfg.Watch.Docker
-	}
-	if container == "" {
-		return fmt.Errorf(
-			"no Docker container specified.\n" +
-				"Set watch.docker in planck.yml or pass --docker <container>.\n" +
-				"See: https://github.com/mihirsn/planck/blob/main/docs/configuration/watch-mode.md",
-		)
-	}
-
-	// --- Run the watcher ---
-	w := watcher.New(cfg, container, fieldMap, cmd.OutOrStdout())
-	w.Run(stop)
+	// --- Run the watcher(s) ---
+	watcher.RunAll(cfg, containers, cmd.OutOrStdout(), stop)
 
 	return nil
 }

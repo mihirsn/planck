@@ -87,7 +87,7 @@ planck analyze --docker my-api
 Continuously monitor a Docker container's logs and send real-time push notifications via [ntfy](https://ntfy.sh) or webhooks when things go wrong.
 
 ```bash
-planck watch --docker my-api
+planck watch
 ```
 
 *(See the [Watch Mode Docs](docs/configuration/watch-mode.md) for configuration and production deployment details).*
