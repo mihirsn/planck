@@ -14,7 +14,6 @@
 
 ```yaml
 watch:
-  docker: my-api              # Docker container name or ID
   interval: 60s               # Poll logs every 60 seconds
   alert_cooldown: 10m         # Don't repeat the same alert within 10 minutes
   preset: fastapi             # Log format preset
@@ -29,7 +28,12 @@ alerts:
 notify:
   ntfy:
     topic: my-api-alerts      # Your ntfy topic name
+
+containers:
+  - name: my-api              # Docker container name or ID to watch
 ```
+
+> **Note on backward compatibility:** In older versions of Planck, the container name was defined using `watch.docker: my-api`. This legacy syntax is still supported for backward compatibility, but it is recommended to use the `containers:` list moving forward as `watch.docker` may be removed in a future release.
 
 **2. Subscribe to your ntfy topic** on your phone or desktop at `ntfy.sh/my-api-alerts`.
 
