@@ -215,7 +215,7 @@ func (c *Config) Validate() error {
 	if c.Watch.Docker != "" && len(c.Containers) > 0 {
 		return fmt.Errorf(
 			"cannot use both watch.docker and containers: in the same config; " +
-				"use containers: for multi-container support, or watch.docker for single-container (legacy)",
+				"please use the containers: list (watch.docker is deprecated)",
 		)
 	}
 
