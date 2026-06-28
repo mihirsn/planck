@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/mihirsn/planck/internal/models"
 )
 
 // validTopicRe matches only safe ntfy topic names: letters, digits, hyphens, underscores.
@@ -17,22 +19,26 @@ var validTopicRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // Config is the top-level structure of planck.yml.
 type Config struct {
-	Watch     WatchConfig     `yaml:"watch"`
-	Alerts    AlertConfig     `yaml:"alerts"`
-	Resources ResourcesConfig `yaml:"resources"`
-	Notify    NotifyConfig    `yaml:"notify"`
+	Watch      WatchConfig       `yaml:"watch"`
+	Alerts     AlertConfig       `yaml:"alerts"`
+	Resources  ResourcesConfig   `yaml:"resources"`
+	Notify     NotifyConfig      `yaml:"notify"`
+	Containers []ContainerConfig `yaml:"containers,omitempty"`
 }
 
 // WatchConfig controls the polling behaviour.
 type WatchConfig struct {
-	// Docker is the Docker container name or ID to watch.
-	// Can be overridden at runtime with the --docker CLI flag.
-	Docker string `yaml:"docker"`
+	// Docker is the legacy single-container field.
+	// Deprecated in favour of the top-level containers: list.
+	// When present and no containers: block is defined, it is automatically
+	// promoted to a single-entry container list (backward-compatible).
+	Docker string `yaml:"docker,omitempty"`
 	// Interval is how often Planck polls logs (e.g. "60s", "2m"). Default: 60s.
 	Interval string `yaml:"interval"`
 	// AlertCooldown prevents repeated alerts for the same breach (e.g. "10m"). Default: 10m.
 	AlertCooldown string `yaml:"alert_cooldown"`
-	// Preset is the log format preset, same as --preset on analyze.
+	// Preset is the global default log format preset, same as --preset on analyze.
+	// Individual containers can override this with their own preset field.
 	Preset string `yaml:"preset"`
 
 	// Parsed values — populated by Validate().
@@ -61,7 +67,7 @@ type AlertConfig struct {
 // All fields are optional; omitting the block entirely disables resource alerts.
 type ResourcesConfig struct {
 	// Interval controls how often container stats are polled (e.g. "30s", "1m").
-	// Defaults to watch.interval when omitted.
+	// Defaults to watch.interval when omitted. Global-only — ignored in per-container overrides.
 	Interval string `yaml:"interval"`
 	// CPU holds the CPU usage threshold.
 	CPU CPUThreshold `yaml:"cpu"`
@@ -108,6 +114,37 @@ type WebhookConfig struct {
 	URL string `yaml:"url"`
 	// Headers is a map of optional HTTP headers. Supports environment variable expansion.
 	Headers map[string]string `yaml:"headers,omitempty"`
+}
+
+// ContainerConfig holds per-container settings. All fields except Name are optional;
+// omitted fields fall back to the global defaults defined at the top level of planck.yml.
+type ContainerConfig struct {
+	// Name is the Docker container name or ID (required).
+	Name string `yaml:"name"`
+	// Preset overrides the global watch.preset for this specific container.
+	Preset string `yaml:"preset,omitempty"`
+	// Alerts overrides the global alert thresholds for this container.
+	// Only the fields that are explicitly set override the global value;
+	// unset fields inherit from the global alerts config (field-level merge).
+	Alerts *AlertConfig `yaml:"alerts,omitempty"`
+	// Resources overrides the global resource thresholds for this container.
+	// The resources.interval field is global-only and is ignored here.
+	Resources *ResourcesConfig `yaml:"resources,omitempty"`
+}
+
+// ResolvedContainer is the fully-merged, ready-to-run configuration for a single
+// container. It is built by ResolveContainers(), which layers per-container
+// overrides on top of global defaults.
+type ResolvedContainer struct {
+	// Name is the Docker container name or ID.
+	Name string
+	// Preset is the resolved preset name (per-container > global watch.preset > "" = default).
+	Preset string
+	// Alerts is the effective alert configuration after merging global + per-container.
+	Alerts AlertConfig
+	// Resources is the effective resource configuration after merging global + per-container.
+	// Resources.IntervalDuration is always sourced from the global config.
+	Resources ResourcesConfig
 }
 
 // DefaultConfigPaths defines where Planck looks for planck.yml, in order.
@@ -174,15 +211,24 @@ func (c *Config) Validate() error {
 	}
 	c.Watch.CooldownDuration = cd
 
-	// --- alerts ---
-	if c.Alerts.ErrorRate.Threshold < 0 || c.Alerts.ErrorRate.Threshold > 100 {
-		return fmt.Errorf("alerts.error_rate.threshold must be between 0 and 100, got %.2f", c.Alerts.ErrorRate.Threshold)
+	// --- watch.docker + containers: mutual exclusivity ---
+	if c.Watch.Docker != "" && len(c.Containers) > 0 {
+		return fmt.Errorf(
+			"cannot use both watch.docker and containers: in the same config; " +
+				"please use the containers: list (watch.docker is deprecated)",
+		)
 	}
-	if c.Alerts.P95Latency.Threshold < 0 {
-		return fmt.Errorf("alerts.p95_latency.threshold must be >= 0, got %.2f", c.Alerts.P95Latency.Threshold)
+
+	// --- global preset ---
+	if c.Watch.Preset != "" {
+		if _, err := models.PresetFieldMap(c.Watch.Preset); err != nil {
+			return fmt.Errorf("watch.preset: %w", err)
+		}
 	}
-	if c.Alerts.RPS < 0 {
-		return fmt.Errorf("alerts.rps must be >= 0, got %.2f", c.Alerts.RPS)
+
+	// --- global alerts ---
+	if err := validateAlertConfig(c.Alerts, "alerts"); err != nil {
+		return err
 	}
 
 	// --- resources ---
@@ -205,6 +251,37 @@ func (c *Config) Validate() error {
 	}
 	if c.Resources.Memory.Absolute < 0 {
 		return fmt.Errorf("resources.memory.absolute must be >= 0, got %.2f", c.Resources.Memory.Absolute)
+	}
+
+	// --- per-container configs ---
+	for i, cc := range c.Containers {
+		if cc.Name == "" {
+			return fmt.Errorf("containers[%d]: name is required", i)
+		}
+		if cc.Preset != "" {
+			if _, err := models.PresetFieldMap(cc.Preset); err != nil {
+				return fmt.Errorf("containers[%s].preset: %w", cc.Name, err)
+			}
+		}
+		if cc.Alerts != nil {
+			if err := validateAlertConfig(*cc.Alerts, fmt.Sprintf("containers[%s].alerts", cc.Name)); err != nil {
+				return err
+			}
+		}
+		if cc.Resources != nil {
+			if cc.Resources.CPU.Threshold < 0 || cc.Resources.CPU.Threshold > 100 {
+				return fmt.Errorf("containers[%s].resources.cpu.threshold must be between 0 and 100, got %.2f",
+					cc.Name, cc.Resources.CPU.Threshold)
+			}
+			if cc.Resources.Memory.Percent < 0 || cc.Resources.Memory.Percent > 100 {
+				return fmt.Errorf("containers[%s].resources.memory.percent must be between 0 and 100, got %.2f",
+					cc.Name, cc.Resources.Memory.Percent)
+			}
+			if cc.Resources.Memory.Absolute < 0 {
+				return fmt.Errorf("containers[%s].resources.memory.absolute must be >= 0, got %.2f",
+					cc.Name, cc.Resources.Memory.Absolute)
+			}
+		}
 	}
 
 	// --- notify ---
@@ -243,6 +320,143 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// validateAlertConfig validates an AlertConfig, using prefix in error messages.
+func validateAlertConfig(a AlertConfig, prefix string) error {
+	if a.ErrorRate.Threshold < 0 || a.ErrorRate.Threshold > 100 {
+		return fmt.Errorf("%s.error_rate.threshold must be between 0 and 100, got %.2f", prefix, a.ErrorRate.Threshold)
+	}
+	if a.P95Latency.Threshold < 0 {
+		return fmt.Errorf("%s.p95_latency.threshold must be >= 0, got %.2f", prefix, a.P95Latency.Threshold)
+	}
+	if a.RPS < 0 {
+		return fmt.Errorf("%s.rps must be >= 0, got %.2f", prefix, a.RPS)
+	}
+	return nil
+}
+
+// ResolveContainers returns the fully-merged list of ResolvedContainers to monitor.
+//
+// Resolution rules:
+//   - If watch.docker is set and no containers: block exists, the single container
+//     is auto-promoted (backward-compatible with the legacy single-container format).
+//   - Each container in containers: is merged with the global defaults.
+//   - watch.docker and containers: set simultaneously is an error (caught in Validate).
+//   - Duplicate container names are rejected.
+//   - An empty container list is an error.
+func (c *Config) ResolveContainers() ([]ResolvedContainer, error) {
+	// Build raw container list, handling legacy auto-promote.
+	var rawContainers []ContainerConfig
+	if c.Watch.Docker != "" {
+		rawContainers = []ContainerConfig{{Name: c.Watch.Docker}}
+	} else {
+		rawContainers = c.Containers
+	}
+
+	if len(rawContainers) == 0 {
+		return nil, fmt.Errorf(
+			"no containers configured.\n" +
+				"Add a containers: list to planck.yml, or use watch.docker for single-container (legacy).\n" +
+				"See: https://github.com/mihirsn/planck/blob/main/docs/configuration/watch-mode.md",
+		)
+	}
+
+	// Reject duplicate names.
+	seen := make(map[string]bool, len(rawContainers))
+	for i, cc := range rawContainers {
+		if cc.Name == "" {
+			return nil, fmt.Errorf("containers[%d]: name is required", i)
+		}
+		if seen[cc.Name] {
+			return nil, fmt.Errorf("duplicate container name %q in containers list", cc.Name)
+		}
+		seen[cc.Name] = true
+	}
+
+	// Resolve each container against the global defaults.
+	resolved := make([]ResolvedContainer, 0, len(rawContainers))
+	for _, cc := range rawContainers {
+		resolved = append(resolved, c.resolveContainer(cc))
+	}
+
+	return resolved, nil
+}
+
+// resolveContainer merges the global defaults with per-container overrides to produce
+// a fully self-contained ResolvedContainer ready for the watcher.
+func (c *Config) resolveContainer(cc ContainerConfig) ResolvedContainer {
+	// Preset: per-container > global watch.preset > "" (caller uses DefaultFieldMap).
+	preset := cc.Preset
+	if preset == "" {
+		preset = c.Watch.Preset
+	}
+
+	return ResolvedContainer{
+		Name:      cc.Name,
+		Preset:    preset,
+		Alerts:    mergeAlerts(c.Alerts, cc.Alerts),
+		Resources: mergeResources(c.Resources, cc.Resources),
+	}
+}
+
+// mergeAlerts returns an AlertConfig composed of per-container override fields layered
+// on top of the global defaults. Merge is field-level within each AlertRule, so a
+// container can override just the threshold without losing global exclude/include paths.
+func mergeAlerts(global AlertConfig, override *AlertConfig) AlertConfig {
+	if override == nil {
+		return global
+	}
+	return AlertConfig{
+		ErrorRate:  mergeAlertRule(global.ErrorRate, override.ErrorRate),
+		P95Latency: mergeAlertRule(global.P95Latency, override.P95Latency),
+		RPS:        mergeFloat64(global.RPS, override.RPS),
+	}
+}
+
+// mergeAlertRule returns an AlertRule where each field is taken from override only
+// when it is explicitly set (non-zero / non-nil), otherwise falls back to global.
+func mergeAlertRule(global, override AlertRule) AlertRule {
+	result := global
+	if override.Threshold != 0 {
+		result.Threshold = override.Threshold
+	}
+	if override.ExcludePaths != nil {
+		result.ExcludePaths = override.ExcludePaths
+	}
+	if override.IncludePaths != nil {
+		result.IncludePaths = override.IncludePaths
+	}
+	return result
+}
+
+// mergeResources returns a ResourcesConfig where threshold fields are taken from
+// override when non-zero, otherwise from global. Interval and IntervalDuration
+// are always taken from the global config (interval is a global-only setting).
+func mergeResources(global ResourcesConfig, override *ResourcesConfig) ResourcesConfig {
+	if override == nil {
+		return global
+	}
+	// Start from global to preserve IntervalDuration and Interval.
+	result := global
+	if override.CPU.Threshold != 0 {
+		result.CPU.Threshold = override.CPU.Threshold
+	}
+	if override.Memory.Percent != 0 {
+		result.Memory.Percent = override.Memory.Percent
+	}
+	if override.Memory.Absolute != 0 {
+		result.Memory.Absolute = override.Memory.Absolute
+	}
+	return result
+}
+
+// mergeFloat64 returns override if non-zero, otherwise global.
+func mergeFloat64(global, override float64) float64 {
+	if override != 0 {
+		return override
+	}
+	return global
 }
 
 // expandHome replaces a leading "~/" with the user's home directory.

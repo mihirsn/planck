@@ -510,3 +510,377 @@ resources:
 		t.Errorf("expected memory.absolute=2048, got %v", cfg.Resources.Memory.Absolute)
 	}
 }
+
+// ─── Multi-container config tests ─────────────────────────────────────────────
+
+func TestLoad_MultiContainer_ParsesCorrectly(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  preset: fastapi
+
+alerts:
+  error_rate:
+    threshold: 10.0
+
+notify:
+  ntfy:
+    topic: my-alerts
+
+containers:
+  - name: my-api
+  - name: my-worker
+    preset: express
+    alerts:
+      error_rate:
+        threshold: 5.0
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Containers) != 2 {
+		t.Fatalf("expected 2 containers, got %d", len(cfg.Containers))
+	}
+	if cfg.Containers[0].Name != "my-api" {
+		t.Errorf("expected containers[0].name=my-api, got %q", cfg.Containers[0].Name)
+	}
+	if cfg.Containers[1].Preset != "express" {
+		t.Errorf("expected containers[1].preset=express, got %q", cfg.Containers[1].Preset)
+	}
+	if cfg.Containers[1].Alerts == nil || cfg.Containers[1].Alerts.ErrorRate.Threshold != 5.0 {
+		t.Errorf("expected containers[1].alerts.error_rate.threshold=5.0")
+	}
+}
+
+func TestResolveContainers_AutoPromote(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  docker: my-api
+
+notify:
+  ntfy:
+    topic: my-topic
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if len(containers) != 1 || containers[0].Name != "my-api" {
+		t.Errorf("expected single container 'my-api', got %v", containers)
+	}
+}
+
+func TestResolveContainers_GlobalDefaultsApplied(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  preset: fastapi
+
+alerts:
+  error_rate:
+    threshold: 10.0
+  p95_latency:
+    threshold: 2000
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+  - name: my-worker
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if len(containers) != 2 {
+		t.Fatalf("expected 2 containers, got %d", len(containers))
+	}
+	for _, rc := range containers {
+		if rc.Preset != "fastapi" {
+			t.Errorf("%s: expected preset=fastapi, got %q", rc.Name, rc.Preset)
+		}
+		if rc.Alerts.ErrorRate.Threshold != 10.0 {
+			t.Errorf("%s: expected error_rate=10.0, got %v", rc.Name, rc.Alerts.ErrorRate.Threshold)
+		}
+		if rc.Alerts.P95Latency.Threshold != 2000 {
+			t.Errorf("%s: expected p95=2000, got %v", rc.Name, rc.Alerts.P95Latency.Threshold)
+		}
+	}
+}
+
+func TestResolveContainers_PerContainerAlertOverride(t *testing.T) {
+	path := writeConfig(t, `
+alerts:
+  error_rate:
+    threshold: 10.0
+  p95_latency:
+    threshold: 2000
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+  - name: my-worker
+    alerts:
+      error_rate:
+        threshold: 2.0
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if containers[0].Alerts.ErrorRate.Threshold != 10.0 {
+		t.Errorf("my-api: expected global threshold 10.0, got %v", containers[0].Alerts.ErrorRate.Threshold)
+	}
+	if containers[1].Alerts.ErrorRate.Threshold != 2.0 {
+		t.Errorf("my-worker: expected overridden threshold 2.0, got %v", containers[1].Alerts.ErrorRate.Threshold)
+	}
+	if containers[1].Alerts.P95Latency.Threshold != 2000 {
+		t.Errorf("my-worker: expected inherited p95=2000, got %v", containers[1].Alerts.P95Latency.Threshold)
+	}
+}
+
+func TestResolveContainers_ExcludePathsInheritedOnThresholdOverride(t *testing.T) {
+	// Overriding just threshold must NOT lose global exclude_paths (field-level merge).
+	path := writeConfig(t, `
+alerts:
+  error_rate:
+    threshold: 10.0
+    exclude_paths:
+      - /health
+      - /metrics
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-worker
+    alerts:
+      error_rate:
+        threshold: 5.0
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	rc := containers[0]
+	if rc.Alerts.ErrorRate.Threshold != 5.0 {
+		t.Errorf("expected threshold=5.0, got %v", rc.Alerts.ErrorRate.Threshold)
+	}
+	if len(rc.Alerts.ErrorRate.ExcludePaths) != 2 {
+		t.Errorf("expected 2 inherited exclude_paths, got %v", rc.Alerts.ErrorRate.ExcludePaths)
+	}
+}
+
+func TestResolveContainers_ExcludePathsReplaced(t *testing.T) {
+	// Per-container exclude_paths fully replaces global list.
+	path := writeConfig(t, `
+alerts:
+  error_rate:
+    threshold: 10.0
+    exclude_paths:
+      - /health
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+    alerts:
+      error_rate:
+        exclude_paths:
+          - /internal
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	rc := containers[0]
+	if rc.Alerts.ErrorRate.Threshold != 10.0 {
+		t.Errorf("expected inherited threshold=10.0, got %v", rc.Alerts.ErrorRate.Threshold)
+	}
+	if len(rc.Alerts.ErrorRate.ExcludePaths) != 1 || rc.Alerts.ErrorRate.ExcludePaths[0] != "/internal" {
+		t.Errorf("expected exclude_paths=[/internal], got %v", rc.Alerts.ErrorRate.ExcludePaths)
+	}
+}
+
+func TestResolveContainers_PerContainerPreset(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  preset: fastapi
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+  - name: my-nginx
+    preset: gin
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if containers[0].Preset != "fastapi" {
+		t.Errorf("my-api: expected preset=fastapi, got %q", containers[0].Preset)
+	}
+	if containers[1].Preset != "gin" {
+		t.Errorf("my-nginx: expected preset=gin, got %q", containers[1].Preset)
+	}
+}
+
+func TestResolveContainers_ResourcesOverride(t *testing.T) {
+	path := writeConfig(t, `
+resources:
+  cpu:
+    threshold: 80
+  memory:
+    percent: 85
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+  - name: my-db
+    resources:
+      cpu:
+        threshold: 95
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	containers, err := cfg.ResolveContainers()
+	if err != nil {
+		t.Fatalf("unexpected resolve error: %v", err)
+	}
+	if containers[0].Resources.CPU.Threshold != 80 {
+		t.Errorf("my-api: expected cpu.threshold=80, got %v", containers[0].Resources.CPU.Threshold)
+	}
+	if containers[1].Resources.CPU.Threshold != 95 {
+		t.Errorf("my-db: expected cpu.threshold=95, got %v", containers[1].Resources.CPU.Threshold)
+	}
+	if containers[1].Resources.Memory.Percent != 85 {
+		t.Errorf("my-db: expected inherited memory.percent=85, got %v", containers[1].Resources.Memory.Percent)
+	}
+}
+
+func TestResolveContainers_NoContainers_Error(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy:
+    topic: my-topic
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	_, err = cfg.ResolveContainers()
+	if err == nil {
+		t.Error("expected error when no containers configured")
+	}
+}
+
+func TestResolveContainers_DuplicateNames_Error(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+  - name: my-api
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected load error: %v", err)
+	}
+	_, err = cfg.ResolveContainers()
+	if err == nil {
+		t.Error("expected error for duplicate container names")
+	}
+}
+
+func TestValidate_BothDockerAndContainers_Error(t *testing.T) {
+	path := writeConfig(t, `
+watch:
+  docker: my-api
+
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-worker
+`)
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error when both watch.docker and containers: are set")
+	}
+}
+
+func TestValidate_Container_InvalidPreset_Error(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+    preset: not-a-real-preset
+`)
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for container with invalid preset")
+	}
+}
+
+func TestValidate_Container_InvalidAlertThreshold_Error(t *testing.T) {
+	path := writeConfig(t, `
+notify:
+  ntfy:
+    topic: my-topic
+
+containers:
+  - name: my-api
+    alerts:
+      error_rate:
+        threshold: 150
+`)
+	_, err := config.Load(path)
+	if err == nil {
+		t.Error("expected error for per-container error_rate.threshold > 100")
+	}
+}

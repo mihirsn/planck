@@ -20,12 +20,52 @@ planck analyze --docker my-api
 
 ## 2. Watch Mode
 
-Use `watch` to continuously monitor a Docker container's logs and send real-time push notifications when things go wrong.
+Use `watch` to continuously monitor one or more Docker containers' logs and send real-time push notifications when things go wrong.
 
-**Start watching:**
+All configuration lives in `planck.yml`. Start by creating one in your working directory:
 
-```bash
-planck watch --docker my-api
+```yaml
+watch:
+  docker: my-api        # Container to monitor (or use containers: for multi-container)
+  interval: 60s
+  preset: fastapi
+
+alerts:
+  error_rate:
+    threshold: 10.0
+
+notify:
+  ntfy:
+    topic: my-api-alerts
 ```
 
-For more details on configuring watch mode with alert thresholds, see the [Watch Mode Configuration](../configuration/watch-mode.md).
+Then run:
+
+```bash
+planck watch
+```
+
+To monitor **multiple containers**, replace `watch.docker` with a `containers:` list:
+
+```yaml
+watch:
+  interval: 60s
+  preset: fastapi
+
+alerts:
+  error_rate:
+    threshold: 10.0
+
+notify:
+  ntfy:
+    topic: my-alerts
+
+containers:
+  - name: my-api
+  - name: my-worker
+    alerts:
+      error_rate:
+        threshold: 2.0    # Stricter threshold for this container
+```
+
+For full configuration options, see the [Watch Mode Reference](../configuration/watch-mode.md).
