@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-06-28
+
+### Added
+- **Multi-Container Watch Support** — `planck watch` can now monitor multiple Docker containers concurrently from a single configuration file.
+  - Added a `containers:` list to `planck.yml` which inherits global defaults.
+  - Each container can specify its own overrides for `alerts`, `resources` (CPU/Memory), and log `preset`.
+  - Independent failure isolation: if one container stops or fails to stream logs, the others continue uninterrupted.
+  - Output lines are automatically prefixed with `[container-name]` when running in multi-container mode.
+
+### Deprecated
+- **`watch.docker` configuration field** — the single-container `watch.docker` field is now deprecated in favor of the unified `containers:` list. It remains fully supported for backward compatibility but will be removed in a future release.
+
 ## [0.3.1] - 2026-06-23
 
 ### Added
@@ -173,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/mihirsn/planck/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/mihirsn/planck/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/mihirsn/planck/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/mihirsn/planck/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mihirsn/planck/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/mihirsn/planck/compare/v0.2.5...v0.2.7
